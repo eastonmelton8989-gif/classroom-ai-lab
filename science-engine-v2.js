@@ -1,8 +1,26 @@
 // EduLabs AI Science Lab - resilient 3D engine
 // New generation layer: never fails because WebGPU is unavailable.
 
+export async function detectBestBackend() {
+  if (navigator.gpu) {
+    try {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (adapter) return 'webgpu';
+    } catch (err) {
+      console.warn('WebGPU unavailable, falling back.', err);
+    }
+  }
+
+  const canvas = document.createElement('canvas');
+  if (canvas.getContext('webgl2')) return 'webgl2';
+  if (canvas.getContext('webgl')) return 'webgl';
+
+  return 'wasm';
+}
+
 export async function createScienceDepth(loadPipeline, model, width = 128, height = 72) {
-  const backends = ['webgpu', 'wasm'];
+  const preferred = await detectBestBackend();
+  const backends = [preferred, 'wasm'].filter((v, i, a) => a.indexOf(v) === i);
 
   for (const device of backends) {
     try {
@@ -13,10 +31,7 @@ export async function createScienceDepth(loadPipeline, model, width = 128, heigh
     }
   }
 
-  return {
-    pipe: null,
-    device: 'fallback'
-  };
+  return { pipe: null, device: 'fallback' };
 }
 
 export function fallbackDepth(width, height) {

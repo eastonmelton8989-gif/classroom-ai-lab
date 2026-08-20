@@ -8,6 +8,11 @@ const fileInput = document.getElementById('file');
 const subjectInput = document.getElementById('subject');
 const topicInput = document.getElementById('topic');
 const threeStatus = document.getElementById('threeStatus');
+const modelProgress = document.getElementById('modelProgress');
+const progressBar = document.getElementById('progressBar');
+const progressPercent = document.getElementById('progressPercent');
+const progressTitle = document.getElementById('progressTitle');
+const progressDetail = document.getElementById('progressDetail');
 
 function setStep(step) {
   if (!threeStatus) return;
@@ -18,6 +23,23 @@ function setStep(step) {
     el.classList.toggle('active', i === index);
     el.classList.toggle('done', i < index || step === 'ready' && i < order.length - 1);
   });
+}
+
+function setProgress(percent, title, detail, busy = true) {
+  if (!modelProgress) return;
+  modelProgress.classList.add('visible');
+  if (progressBar) {
+    progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    progressBar.classList.toggle('busy', busy && percent < 100);
+  }
+  if (progressPercent) progressPercent.textContent = `${Math.round(percent)}%`;
+  if (progressTitle) progressTitle.textContent = title;
+  if (progressDetail) progressDetail.textContent = detail;
+}
+
+function hideProgress() {
+  modelProgress?.classList.remove('visible');
+  progressBar?.classList.remove('busy');
 }
 
 function friendlyError(error) {
@@ -36,37 +58,61 @@ async function generateReal3D() {
   if (!file) {
     status.textContent = 'Choose a science image first.';
     setStep('prepare');
+    hideProgress();
     return;
   }
 
   if (!file.type.startsWith('image/')) {
     status.textContent = 'Please choose an image file.';
+    hideProgress();
     return;
   }
 
   threeButton.disabled = true;
+  threeButton.classList.add('generate-busy');
+  const originalButtonText = threeButton.dataset.originalText || threeButton.textContent;
+  threeButton.dataset.originalText = originalButtonText;
+  threeButton.textContent = 'Creating 3D Model…';
   if (downloadButton) downloadButton.hidden = true;
+
   setStep('prepare');
+  setProgress(8, 'Preparing image…', 'Checking your image and sending it to the 3D generator.');
   status.textContent = 'Preparing your science image…';
 
   try {
-    // The server/worker performs the model-specific image preparation.
     const data = new FormData();
     data.append('image', file, file.name);
     data.append('subject', subjectInput?.value || 'general');
     data.append('topic', topicInput?.value?.trim() || '');
 
     setStep('generate');
+    setProgress(25, 'Creating your 3D model…', 'AI reconstruction is running. This may take a little while.');
     status.textContent = 'Creating your 3D model… This can take a little while.';
 
-    const response = await fetch('/api/generate-3d', {
-      method: 'POST',
-      body: data,
-      headers: {
-        'x-edulabs-subject': subjectInput?.value || 'general',
-        'x-edulabs-topic': topicInput?.value?.trim() || ''
+    // The browser cannot know the worker's exact percentage, so this is an
+    // honest stage-based progress indicator rather than pretending to have
+    // server-side progress telemetry.
+    const progressTimer = setInterval(() => {
+      const current = parseInt(progressPercent?.textContent || '25', 10) || 25;
+      if (current < 68) {
+        const next = Math.min(68, current + 1);
+        setProgress(next, 'Creating your 3D model…', 'AI reconstruction is still running. Please keep this page open.');
       }
-    });
+    }, 1200);
+
+    let response;
+    try {
+      response = await fetch('/api/generate-3d', {
+        method: 'POST',
+        body: data,
+        headers: {
+          'x-edulabs-subject': subjectInput?.value || 'general',
+          'x-edulabs-topic': topicInput?.value?.trim() || ''
+        }
+      });
+    } finally {
+      clearInterval(progressTimer);
+    }
 
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.message || result.error || `3D service returned ${response.status}`);
@@ -76,6 +122,7 @@ async function generateReal3D() {
 
     generatedModelUrl = modelUrl;
     setStep('fix');
+    setProgress(78, 'Setting up your 3D model…', 'Centering, scaling, and orienting the model for the viewer.');
     status.textContent = 'Centering and orienting the 3D model…';
 
     window.loadScienceModel(modelUrl);
@@ -89,6 +136,7 @@ async function generateReal3D() {
     });
 
     setStep('ready');
+    setProgress(100, '3D model ready!', 'Your model is loaded. Drag to rotate and scroll to zoom.', false);
     if (downloadButton) {
       downloadButton.href = modelUrl;
       downloadButton.hidden = false;
@@ -97,9 +145,12 @@ async function generateReal3D() {
   } catch (error) {
     console.error('EduLabs 3D generation failed:', error);
     setStep('prepare');
+    setProgress(0, '3D generation stopped', friendlyError(error), false);
     status.textContent = friendlyError(error);
   } finally {
     threeButton.disabled = false;
+    threeButton.classList.remove('generate-busy');
+    threeButton.textContent = originalButtonText;
   }
 }
 

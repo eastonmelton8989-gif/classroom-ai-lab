@@ -1,1 +1,32 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EduLabs AI · All-Science 3D Lab</title><link rel="stylesheet" href="styles.css"></head><body><header class="nav"><a class="brand" href="index.html">◈ <span>EduLabs AI</span></a><nav><a href="index.html">Home</a><a href="video.html">Video Lab</a><a href="science.html">All-Science 3D Lab</a></nav></header><main class="lab"><a class="toplink" href="index.html">← Back home</a><h1>All-Science 3D Lab</h1><p>Turn science diagrams into interactive AI-generated 3D models.</p><section class="panel"><div class="drop green" id="drop"><div style="font-size:40px">◈</div><b>Choose a science diagram or drag an image here</b><div class="small">PNG, JPG, WEBP</div><input id="file" type="file" accept="image/*"></div><div class="row"><select class="field" id="subject"><option value="general">General Science</option><option value="biology">Biology</option><option value="chemistry">Chemistry</option><option value="physics">Physics</option></select><input class="field" id="topic" placeholder="What are you studying?"><button class="btn green" id="generate">Generate AI Lesson</button><button class="btn green" id="generate3d">Generate Real 3D Model</button></div><div class="scene"><canvas id="canvas"></canvas></div><a id="download3d" class="button" hidden download="science-model.glb">Download 3D Model</a><div class="status" id="status">Upload a diagram to begin.</div></section></main><footer>EduLabs AI · Free science visualization</footer><script src="ai-3d-generator.js"></script><script src="three-viewer.js"></script><script src="science.js"></script><script src="science-3d-ui.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EduLabs AI · All-Science 3D Lab</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.three-status{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}.three-step{padding:7px 10px;border-radius:999px;background:#0f172a;border:1px solid #334155;color:#94a3b8;font-size:13px}.three-step.active{color:#fff;border-color:#22c55e}.three-step.done{color:#86efac;border-color:#166534}.scene{min-height:460px;position:relative}.scene canvas{width:100%;height:460px;display:block;border-radius:12px;touch-action:none}.model-help{font-size:13px;color:#94a3b8;margin-top:8px}.error-box{color:#fecaca;background:#450a0a;border:1px solid #7f1d1d;padding:10px;border-radius:10px;margin-top:10px}
+</style>
+</head>
+<body>
+<header class="nav"><a class="brand" href="index.html">◈ <span>EduLabs AI</span></a><nav><a href="index.html">Home</a><a href="video.html">Video Lab</a><a href="science.html">All-Science 3D Lab</a></nav></header>
+<main class="lab">
+<a class="toplink" href="index.html">← Back home</a>
+<h1>All-Science 3D Lab</h1>
+<p>Upload a science image and EduLabs AI will prepare it, create a 3D model, and place it in an interactive viewer.</p>
+<section class="panel">
+<div class="drop green" id="drop"><div style="font-size:40px">◈</div><b>Choose a science image or drag it here</b><div class="small">PNG, JPG, WEBP · One main object works best</div><input id="file" type="file" accept="image/*"></div>
+<div class="row"><select class="field" id="subject"><option value="general">General Science</option><option value="biology">Biology</option><option value="chemistry">Chemistry</option><option value="physics">Physics</option><option value="earth">Earth Science</option><option value="astronomy">Astronomy</option><option value="environment">Environmental Science</option><option value="anatomy">Anatomy</option></select><input class="field" id="topic" placeholder="Optional: what are you studying?"><button class="btn green" id="generate3d">Create 3D Model</button><button class="btn green" id="generate">Make Lesson Video</button></div>
+<div class="three-status" id="threeStatus" aria-live="polite"><span class="three-step" data-step="prepare">1. Prepare image</span><span class="three-step" data-step="generate">2. Create 3D</span><span class="three-step" data-step="fix">3. Set up model</span><span class="three-step" data-step="ready">4. Ready</span></div>
+<div class="scene"><canvas id="canvas" aria-label="Interactive 3D science model"></canvas></div>
+<div class="model-help">Drag to rotate · Scroll to zoom · The model is centered and automatically oriented for viewing.</div>
+<a id="download3d" class="button" hidden download="science-model.glb">Download 3D Model</a>
+<div class="status" id="status">Upload a diagram or science image to begin.</div>
+</section>
+</main>
+<footer>EduLabs AI · Free science visualization</footer>
+<script src="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.180.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="ai-3d-generator.js"></script><script src="three-viewer.js"></script><script src="science.js"></script><script src="science-3d-ui.js"></script>
+</body></html>

@@ -7,7 +7,10 @@ const downloadButton = document.getElementById('download3d');
 async function generateReal3D(){
   const input=document.getElementById('file');
   const status=document.getElementById('status');
-  if(!input.files[0]){status.textContent='Upload a science diagram first.';return;}
+  if(!input?.files[0]){
+    status.textContent='Upload a science diagram first.';
+    return;
+  }
 
   status.textContent='Sending diagram to AI 3D generator...';
   const data=new FormData();
@@ -16,13 +19,24 @@ async function generateReal3D(){
   try{
     const response=await fetch('/api/generate-3d',{method:'POST',body:data});
     const result=await response.json();
-    if(!result.modelUrl) throw new Error(result.error||'No model returned');
-    generatedModelUrl=result.modelUrl;
-    window.loadScienceModel(result.modelUrl);
-    downloadButton.hidden=false;
-    status.textContent='3D model generated successfully.';
+
+    if(result.modelUrl){
+      generatedModelUrl=result.modelUrl;
+      window.loadScienceModel(result.modelUrl);
+      downloadButton.hidden=false;
+      status.textContent='3D model generated successfully.';
+      return;
+    }
+
+    if(result.mode==='demo'){
+      status.textContent='AI worker is offline. Science Lab demo mode is active.';
+      return;
+    }
+
+    throw new Error(result.error||'No model returned');
   }catch(error){
-    status.textContent='3D generation is not connected yet: '+error.message;
+    status.textContent='AI 3D worker unavailable. Demo mode remains available.';
+    console.error(error);
   }
 }
 

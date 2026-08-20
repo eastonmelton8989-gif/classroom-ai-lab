@@ -1,36 +1,43 @@
 // EduLabs AI Science Lab - Image to 3D API
-//
-// This endpoint connects the website to a self-hosted open-source
-// image-to-3D worker. Set TRIPOSR_ENDPOINT in Vercel environment variables.
-// The worker should accept multipart form data with an image and return:
-// { modelUrl: "https://.../model.glb" }
+// Connects to an optional self-hosted TripoSR worker.
+// If no worker is available, the frontend can use demo mode.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST required' });
   }
 
-  if (!process.env.TRIPOSR_ENDPOINT) {
+  const endpoint = process.env.TRIPOSR_ENDPOINT;
+
+  if (!endpoint) {
     return res.status(503).json({
-      error: '3D AI worker is not connected yet',
-      setup: 'Add TRIPOSR_ENDPOINT to your Vercel environment variables.'
+      available: false,
+      mode: 'demo',
+      error: 'AI 3D worker is offline',
+      message: 'Connect a local TripoSR worker with TRIPOSR_ENDPOINT.'
     });
   }
 
   try {
-    const response = await fetch(process.env.TRIPOSR_ENDPOINT, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'content-type': req.headers['content-type'] || ''
+        'content-type': req.headers['content-type'] || 'application/octet-stream'
       },
       body: req
     });
 
     const data = await response.json();
-    return res.status(response.status).json(data);
+
+    return res.status(response.status).json({
+      available: true,
+      ...data
+    });
   } catch (error) {
-    return res.status(500).json({
-      error: '3D generation failed',
+    return res.status(503).json({
+      available: false,
+      mode: 'demo',
+      error: 'AI worker unreachable',
       details: error.message
     });
   }

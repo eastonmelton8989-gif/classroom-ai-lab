@@ -50,9 +50,11 @@ export default async function handler(req, res) {
         throw new Error(`3D worker returned ${response.status}: ${data.detail || data.message || data.error || 'Unknown worker error'}`);
       }
 
+      const modelUrl = data.modelUrl || data.glbUrl || data.url;
+      if (!modelUrl) throw new Error('3D worker returned no GLB model URL.');
       return res.status(200).json({
         available: true,
-        modelUrl: data.modelUrl || data.glbUrl || data.url,
+        modelUrl: `/api/model-proxy?url=${encodeURIComponent(modelUrl)}`,
         format: 'glb'
       });
     }

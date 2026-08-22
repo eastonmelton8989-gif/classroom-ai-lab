@@ -44,8 +44,12 @@ export default async function handler(req, res) {
         signal: controller.signal
       });
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || '3D worker failed');
+      const raw = await response.text();
+      let data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { data = { message: raw }; }
+      if (!response.ok) {
+        throw new Error(`3D worker returned ${response.status}: ${data.detail || data.message || data.error || 'Unknown worker error'}`);
+      }
 
       return res.status(200).json({
         available: true,

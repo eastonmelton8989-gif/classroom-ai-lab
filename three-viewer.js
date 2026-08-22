@@ -56,7 +56,11 @@ function createViewer() {
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) {
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+  } else {
+    renderer.outputEncoding = THREE.sRGBEncoding;
+  }
   renderer.setClearColor(0x020817, 1);
 
   const scene = new THREE.Scene();

@@ -90,8 +90,18 @@
     image.onload = () => { position = 0; isPlaying = false; caption.textContent = 'Lesson ready. Press Play or drag the progress bar to explore.'; render(); };
     image.src = sourceUrl;
   }
-  file.addEventListener('change', event => loadImage(event.target.files[0]));
-  drop?.addEventListener('drop', event => { const selected = event.dataTransfer?.files?.[0]; if (selected) loadImage(selected); });
+  function selectImage(selected) {
+    if (!selected || !selected.type.startsWith('image/')) {
+      caption.textContent = 'Please choose a PNG, JPG, WEBP, or another image file.';
+      return;
+    }
+    loadImage(selected);
+  }
+  file.addEventListener('change', event => selectImage(event.target.files[0]));
+  drop?.addEventListener('click', () => file.click());
+  drop?.addEventListener('dragover', event => { event.preventDefault(); drop.classList.add('active'); });
+  drop?.addEventListener('dragleave', () => drop.classList.remove('active'));
+  drop?.addEventListener('drop', event => { event.preventDefault(); drop.classList.remove('active'); selectImage(event.dataTransfer?.files?.[0]); });
   play.addEventListener('click', () => setPlaying(!isPlaying));
   back.addEventListener('click', () => { position = Math.max(0, position - 10); render(); });
   forward.addEventListener('click', () => { position = Math.min(duration, position + 10); render(); });

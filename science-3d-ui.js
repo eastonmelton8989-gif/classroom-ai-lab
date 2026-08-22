@@ -37,6 +37,15 @@ function setProgress(percent, title, detail, busy = true) {
   if (progressDetail) progressDetail.textContent = detail;
 }
 
+function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('The image could not be read.'));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
 function hideProgress() {
   modelProgress?.classList.remove('visible');
   progressBar?.classList.remove('busy');
@@ -80,10 +89,7 @@ async function generateReal3D() {
   status.textContent = 'Preparing your science image…';
 
   try {
-    const data = new FormData();
-    data.append('image', file, file.name);
-    data.append('subject', subjectInput?.value || 'general');
-    data.append('topic', topicInput?.value?.trim() || '');
+    const imageBase64 = await readImageAsDataUrl(file);
 
     setStep('generate');
     setProgress(25, 'Creating your 3D model…', 'AI reconstruction is running. This may take a little while.');
@@ -104,11 +110,13 @@ async function generateReal3D() {
     try {
       response = await fetch('/api/generate-3d', {
         method: 'POST',
-        body: data,
-        headers: {
-          'x-edulabs-subject': subjectInput?.value || 'general',
-          'x-edulabs-topic': topicInput?.value?.trim() || ''
-        }
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64,
+          imageName: file.name,
+          subject: subjectInput?.value || 'general',
+          topic: topicInput?.value?.trim() || ''
+        })
       });
     } finally {
       clearInterval(progressTimer);

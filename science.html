@@ -8,6 +8,7 @@
 <style>
 .three-status{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}.three-step{padding:7px 10px;border-radius:999px;background:#0f172a;border:1px solid #334155;color:#94a3b8;font-size:13px}.three-step.active{color:#fff;border-color:#22c55e}.three-step.done{color:#86efac;border-color:#166534}.scene{min-height:460px;position:relative}.scene canvas{width:100%;height:460px;display:block;border-radius:12px;touch-action:none}.model-help{font-size:13px;color:#94a3b8;margin-top:8px}.error-box{color:#fecaca;background:#450a0a;border:1px solid #7f1d1d;padding:10px;border-radius:10px;margin-top:10px}
 .model-progress{display:none;margin:14px 0 2px;padding:14px 16px;border:1px solid #334155;border-radius:12px;background:#0f172a}.model-progress.visible{display:block}.progress-top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:9px}.progress-title{font-weight:700;color:#fff}.progress-percent{font-variant-numeric:tabular-nums;color:#86efac;font-weight:700}.progress-track{height:10px;background:#1e293b;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0%;background:#22c55e;border-radius:999px;transition:width .35s ease;position:relative;overflow:hidden}.progress-bar.busy::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);animation:progressShimmer 1.25s infinite}.progress-detail{margin-top:8px;color:#94a3b8;font-size:13px}.generate-busy{cursor:wait;opacity:.85}.generate-busy::before{content:"";display:inline-block;width:12px;height:12px;margin-right:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@keyframes progressShimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.lesson-player{margin-top:28px;border:1px solid #205278;border-radius:16px;padding:18px;background:#07152f}.lesson-player h2{margin:0 0 5px}.lesson-player p{color:#b7c7e5;margin:0 0 14px}.lesson-canvas{width:100%;height:430px;display:block;background:#020817;border:1px solid #18366a;border-radius:12px;touch-action:none}.lesson-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}.lesson-controls button{min-width:48px}.lesson-time{font-variant-numeric:tabular-nums;color:#cbd5e1;font-size:14px;white-space:nowrap}.lesson-seek{flex:1;min-width:150px;accent-color:#38bdf8}.lesson-caption{min-height:26px;margin-top:10px;color:#dbeafe;font-weight:600}.lesson-control-help{font-size:13px;color:#94a3b8;margin-top:7px}
 </style>
 </head>
 <body>
@@ -15,20 +16,34 @@
 <main class="lab">
 <a class="toplink" href="index.html">← Back home</a>
 <h1>All-Science 3D Lab</h1>
-<p>Upload a science image and EduLabs AI will prepare it, create a 3D model, and place it in an interactive viewer.</p>
+<p>Upload a science image to explore it in 3D and as an animated, browser-based lesson.</p>
 <section class="panel">
 <div class="drop green" id="drop"><div style="font-size:40px">◈</div><b>Choose a science image or drag it here</b><div class="small">PNG, JPG, WEBP · One main object works best</div><input id="file" type="file" accept="image/*"></div>
-<div class="row"><select class="field" id="subject"><option value="general">General Science</option><option value="biology">Biology</option><option value="chemistry">Chemistry</option><option value="physics">Physics</option><option value="earth">Earth Science</option><option value="astronomy">Astronomy</option><option value="environment">Environmental Science</option><option value="anatomy">Anatomy</option></select><input class="field" id="topic" placeholder="Optional: what are you studying?"><button class="btn green" id="generate3d">Create 3D Model</button><button class="btn green" id="generate">Make Lesson Video</button></div>
+<div class="row"><select class="field" id="subject"><option value="general">General Science</option><option value="biology">Biology</option><option value="chemistry">Chemistry</option><option value="physics">Physics</option><option value="earth">Earth Science</option><option value="astronomy">Astronomy</option><option value="environment">Environmental Science</option><option value="anatomy">Anatomy</option></select><input class="field" id="topic" placeholder="Optional: what are you studying?"><button class="btn green" id="generate3d">Create 3D Model</button></div>
 <div class="three-status" id="threeStatus" aria-live="polite"><span class="three-step" data-step="prepare">1. Prepare image</span><span class="three-step" data-step="generate">2. Create 3D</span><span class="three-step" data-step="fix">3. Set up model</span><span class="three-step" data-step="ready">4. Ready</span></div>
 <div class="model-progress" id="modelProgress" role="status" aria-live="polite" aria-label="3D model generation progress"><div class="progress-top"><span class="progress-title" id="progressTitle">Getting ready…</span><span class="progress-percent" id="progressPercent">0%</span></div><div class="progress-track"><div class="progress-bar" id="progressBar"></div></div><div class="progress-detail" id="progressDetail">Your image has been received. Please keep this page open.</div></div>
 <div class="scene"><canvas id="canvas" aria-label="Interactive 3D science model"></canvas></div>
 <div class="model-help">Drag to rotate · Scroll to zoom · The model is centered and automatically oriented for viewing.</div>
 <a id="download3d" class="button" hidden download="science-model.glb">Download 3D Model</a>
 <div class="status" id="status">Upload a diagram or science image to begin.</div>
+<div class="lesson-player" aria-labelledby="lessonTitle">
+<h2 id="lessonTitle">Animated lesson video</h2>
+<p>Free browser-based lesson player. Use its progress bar to jump anywhere, pause, or rewind.</p>
+<canvas id="lessonCanvas" class="lesson-canvas" aria-label="Animated science lesson"></canvas>
+<div class="lesson-controls" aria-label="Lesson video controls">
+<button class="btn" id="lessonPlay" type="button" aria-label="Play lesson">▶ Play</button>
+<button class="btn" id="lessonBack" type="button" aria-label="Rewind ten seconds">↶ 10s</button>
+<button class="btn" id="lessonForward" type="button" aria-label="Forward ten seconds">10s ↷</button>
+<input id="lessonSeek" class="lesson-seek" type="range" min="0" max="1000" value="0" aria-label="Lesson progress">
+<span class="lesson-time" id="lessonTime">0:00 / 1:00</span>
+</div>
+<div class="lesson-caption" id="lessonCaption" aria-live="polite">Upload an image to start your lesson.</div>
+<div class="lesson-control-help">Tip: drag the progress bar to rewind, replay, or jump to any lesson step.</div>
+</div>
 </section>
 </main>
 <footer>EduLabs AI · Free science visualization</footer>
 <script src="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.180.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="ai-3d-generator.js"></script><script src="three-viewer.js"></script><script src="science.js"></script><script src="science-3d-ui.js"></script>
+<script src="ai-3d-generator.js"></script><script src="three-viewer.js"></script><script src="science-3d-ui.js"></script><script src="science.js"></script>
 </body></html>

@@ -4,6 +4,7 @@
   const drop = document.getElementById('drop');
   const subject = document.getElementById('subject');
   const topic = document.getElementById('topic');
+  const parts = document.getElementById('parts');
   const play = document.getElementById('lessonPlay');
   const back = document.getElementById('lessonBack');
   const forward = document.getElementById('lessonForward');
@@ -12,7 +13,7 @@
   const caption = document.getElementById('lessonCaption');
   if (!canvas || !file || !play || !seek) return;
 
-  let image = null, sourceUrl = null, isPlaying = false, position = 0, lastFrame = 0, frame = 0;
+  let image = null, sourceUrl = null, isPlaying = false, position = 0, lastFrame = 0, frame = 0, announcedStep = -1;
   const duration = 60;
   const lessonBanks = {
     general: ['Introduce the science diagram and the question it explores.', 'Identify the important objects, labels, arrows, and relationships.', 'Focus on the first major part and explain its job.', 'Trace the process or relationship shown in the diagram.', 'Connect the parts and explain how the system works.', 'Review the whole system and its key scientific idea.'],
@@ -24,7 +25,21 @@
     const bank = lessonBanks[subject?.value] || lessonBanks.general;
     const output = [...bank];
     if (topic?.value?.trim()) output[0] = 'Introduce ' + topic.value.trim() + ' and orient the viewer to the diagram.';
+    const namedParts = (parts?.value || '').split(',').map(value => value.trim()).filter(Boolean);
+    if (namedParts.length) {
+      namedParts.slice(0, 4).forEach((part, index) => {
+        output[Math.min(index + 1, output.length - 2)] = 'Find ' + part + ' in the model and explain what role it plays in ' + (topic?.value?.trim() || cSubject()) + '.';
+      });
+    }
     return output;
+  }
+  function cSubject() { return subject?.options?.[subject.selectedIndex]?.text || 'this science system'; }
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const message = new SpeechSynthesisUtterance(text);
+    message.rate = 0.94;
+    window.speechSynthesis.speak(message);
   }
   function format(seconds) {
     const value = Math.max(0, Math.min(duration, seconds));
@@ -59,6 +74,10 @@
     ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(24, h - 27, w - 48, 7);
     ctx.fillStyle = '#38bdf8'; ctx.fillRect(24, h - 27, (w - 48) * progress, 7);
     caption.textContent = lessonSteps[index];
+    if (isPlaying && index !== announcedStep) {
+      announcedStep = index;
+      speak(lessonSteps[index]);
+    }
   }
   function updateUi() {
     seek.value = Math.round(position / duration * 1000);
@@ -79,6 +98,7 @@
     if (!image) { caption.textContent = 'Upload a science image before starting the lesson.'; return; }
     if (position >= duration) position = 0;
     isPlaying = value; lastFrame = 0;
+    if (!isPlaying) window.speechSynthesis?.cancel();
     if (isPlaying) { cancelAnimationFrame(frame); frame = requestAnimationFrame(tick); }
     render();
   }
@@ -87,7 +107,7 @@
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     sourceUrl = URL.createObjectURL(selected);
     image = new Image();
-    image.onload = () => { position = 0; isPlaying = false; caption.textContent = 'Lesson ready. Press Play or drag the progress bar to explore.'; render(); };
+    image.onload = () => { position = 0; isPlaying = false; announcedStep = -1; caption.textContent = 'Lesson ready. Press Play or drag the progress bar to explore.'; render(); };
     image.src = sourceUrl;
   }
   function selectImage(selected) {

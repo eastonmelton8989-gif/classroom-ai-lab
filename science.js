@@ -21,16 +21,32 @@
     chemistry: ['Introduce the chemical system and its conditions.', 'Identify atoms, molecules, bonds, labels, and equipment.', 'Explain the starting substances and their arrangement.', 'Trace the reaction or chemical transformation.', 'Explain what changed and what was produced.', 'Review the chemistry from start to finish.'],
     physics: ['Introduce the physical system and quantity being demonstrated.', 'Identify objects, forces, fields, waves, and components.', 'Explain the starting state and important variables.', 'Trace motion, energy, force, or signal flow.', 'Connect changes to the governing physical principle.', 'Review the system and summarize the physics.']
   };
+  const partFacts = {
+    nucleus: 'The nucleus acts like the cell’s information center. It stores genetic instructions and helps direct many of the cell’s everyday activities.',
+    membrane: 'The cell membrane is a selective boundary. It helps control what enters and leaves the cell, protecting the cell while allowing needed materials through.',
+    mitochondria: 'Mitochondria release usable energy from food molecules. Cells with high energy needs often contain many mitochondria.',
+    chloroplast: 'Chloroplasts capture light energy. In plant cells, they use that energy to help make sugars through photosynthesis.',
+    ribosome: 'Ribosomes assemble proteins. Proteins are used to build structures, carry messages, and support many chemical reactions.',
+    cell wall: 'The cell wall gives a plant cell extra strength and shape. It sits outside the cell membrane.',
+    atom: 'An atom has a tiny dense nucleus surrounded by electrons. The number and arrangement of its particles help determine its properties.',
+    heart: 'The heart is a muscular pump. Its chambers and valves work together to keep blood moving in one direction.'
+  };
   function steps() {
     const bank = lessonBanks[subject?.value] || lessonBanks.general;
-    const output = [...bank];
-    if (topic?.value?.trim()) output[0] = 'Introduce ' + topic.value.trim() + ' and orient the viewer to the diagram.';
+    const focus = topic?.value?.trim() || cSubject();
+    const output = bank.map((line, index) => {
+      const openings = ['Let’s begin by getting oriented.', 'Now slow down and look carefully.', 'Here is the important part.', 'Next, follow the change or movement.', 'Now connect the evidence.', 'To finish, bring the whole idea together.'];
+      return openings[index] + ' ' + line + ' Think about how this relates to ' + focus + '.';
+    });
+    output[0] = 'Welcome. We are exploring ' + focus + '. Start with the largest shapes and labels. Before memorizing names, notice how the parts are arranged and what appears to move, change, or connect.';
     const namedParts = (parts?.value || '').split(',').map(value => value.trim()).filter(Boolean);
     if (namedParts.length) {
       namedParts.slice(0, 4).forEach((part, index) => {
-        output[Math.min(index + 1, output.length - 2)] = 'Find ' + part + ' in the model and explain what role it plays in ' + (topic?.value?.trim() || cSubject()) + '.';
+        const fact = partFacts[part.toLowerCase()] || ('Locate ' + part + '. Notice its position, shape, and connections to nearby structures. Those clues help explain its job in ' + focus + '.');
+        output[Math.min(index + 1, output.length - 2)] = 'Let’s focus on ' + part + '. ' + fact + ' In the model, rotate and zoom in so you can see how it relates to the surrounding parts.';
       });
     }
+    output[output.length - 1] = 'Let’s review ' + focus + '. The key is not just naming the parts. Explain how each part contributes to the larger system or process, then use the model to check that story one more time.';
     return output;
   }
   function cSubject() { return subject?.options?.[subject.selectedIndex]?.text || 'this science system'; }
@@ -38,7 +54,12 @@
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const message = new SpeechSynthesisUtterance(text);
-    message.rate = 0.94;
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(voice => /^en-US/i.test(voice.lang) && /natural|aria|jenny|zira|samantha/i.test(voice.name))
+      || voices.find(voice => /^en/i.test(voice.lang));
+    if (preferred) message.voice = preferred;
+    message.rate = 0.84;
+    message.pitch = 0.96;
     window.speechSynthesis.speak(message);
   }
   function format(seconds) {

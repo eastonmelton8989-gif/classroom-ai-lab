@@ -8,6 +8,7 @@ export default async function handler(req, res) {
   }
 
   const endpoint = process.env.TRIPOSR_ENDPOINT;
+  const workerToken = process.env.TRIPOSR_TOKEN;
   const falKey = process.env.FAL_KEY;
 
   if (!endpoint && !falKey) {
@@ -35,7 +36,8 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: {
           'content-type': contentType,
-          accept: 'application/json'
+          accept: 'application/json',
+          ...(workerToken ? { authorization: `Bearer ${workerToken}` } : {})
         },
         body: req,
         duplex: 'half',

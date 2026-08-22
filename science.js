@@ -15,6 +15,11 @@
   const zoomOut = document.getElementById('imageZoomOut');
   const zoomReset = document.getElementById('imageZoomReset');
   const zoomReadout = document.getElementById('imageZoomReadout');
+  const lessonLoading = document.getElementById('lessonLoading');
+  const lessonLoadingFill = document.getElementById('lessonLoadingFill');
+  const lessonLoadingTitle = document.getElementById('lessonLoadingTitle');
+  const lessonLoadingPercent = document.getElementById('lessonLoadingPercent');
+  const lessonLoadingDetail = document.getElementById('lessonLoadingDetail');
   if (!canvas || !file || !play || !seek) return;
 
   let image = null, sourceUrl = null, isPlaying = false, position = 0, lastFrame = 0, frame = 0, announcedStep = -1;
@@ -39,6 +44,13 @@
   };
 
   function cSubject() { return subject?.options?.[subject.selectedIndex]?.text || 'this science system'; }
+  function setLessonLoading(value, title, detail) {
+    lessonLoading?.classList.add('show');
+    if (lessonLoadingFill) lessonLoadingFill.style.width = Math.max(0, Math.min(100, value)) + '%';
+    if (lessonLoadingPercent) lessonLoadingPercent.textContent = Math.round(value) + '%';
+    if (lessonLoadingTitle) lessonLoadingTitle.textContent = title;
+    if (lessonLoadingDetail) lessonLoadingDetail.textContent = detail;
+  }
   function imageClue() {
     if (analysisInProgress) return 'I am still looking at the uploaded picture, so give me one moment before pressing Play.';
     if (!analysis?.labels?.length) return 'I can see the uploaded picture. If you tell me the topic or key parts, I can make the explanation even more specific.';
@@ -79,6 +91,7 @@
     if (!sourceUrl || analysisInProgress) return;
     analysisInProgress = true;
     analysis = null;
+    setLessonLoading(45, 'Analyzing picture…', 'The free on-device AI is looking at the image.');
     caption.textContent = 'Looking at your image with the free on-device AI…';
     render();
     try {
@@ -87,9 +100,11 @@
       const results = await classifier(sourceUrl, { topk: 3 });
       const labels = results.map(item => String(item.label || '').replace(/_/g, ' ')).filter(Boolean);
       analysis = { labels };
+      setLessonLoading(100, 'Lesson ready!', labels.length ? 'Image scan finished. Press Play to hear the explanation.' : 'Picture is ready. Press Play to hear the explanation.');
       caption.textContent = labels.length ? 'Image analyzed: I noticed ' + labels.join(', ') + '. Press Play for the detailed lesson.' : 'Image scan finished. Press Play for the detailed lesson.';
     } catch (error) {
       console.warn('Image analysis unavailable:', error);
+      setLessonLoading(100, 'Lesson ready!', 'Your picture is loaded. Add a topic or key parts for a more specific explanation.');
       caption.textContent = 'Your picture is ready. Add a topic or key parts for a more specific explanation.';
     } finally {
       analysisInProgress = false;
@@ -175,6 +190,7 @@
     image = new Image();
     image.onload = () => {
       position = 0; isPlaying = false; announcedStep = -1; resetZoom();
+      setLessonLoading(20, 'Picture received!', 'Preparing the animated lesson from your image…');
       caption.textContent = 'Picture loaded. The free AI is now looking at it.';
       render(); analyzeImage();
     };

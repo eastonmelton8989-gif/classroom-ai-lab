@@ -1,0 +1,22 @@
+(() => {
+  const style = document.createElement('style');
+  style.textContent = `.octopus-launch{position:fixed;right:22px;bottom:22px;z-index:50;border:0;border-radius:999px;padding:13px 17px;background:#7c3aed;color:#fff;font:700 15px system-ui;box-shadow:0 12px 30px #0008;cursor:pointer}.octopus-panel{position:fixed;right:22px;bottom:78px;z-index:51;width:min(360px,calc(100vw - 32px));border:1px solid #5b21b6;border-radius:18px;background:#07152f;color:#eff6ff;box-shadow:0 20px 55px #000b;padding:16px}.octopus-panel[hidden]{display:none}.octopus-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.octopus-top b{font-size:18px}.octopus-close{border:0;background:transparent;color:#c4b5fd;font-size:22px;cursor:pointer}.octopus-answer{min-height:76px;margin:12px 0;padding:12px;border-radius:11px;background:#0f2145;color:#dbeafe}.octopus-form{display:flex;gap:8px}.octopus-form input{min-width:0;flex:1;border:1px solid #365889;border-radius:10px;padding:10px;background:#020817;color:#fff}.octopus-form button{border:0;border-radius:10px;padding:10px 12px;background:#7c3aed;color:#fff;font-weight:700;cursor:pointer}.octopus-prompts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.octopus-prompts button{border:1px solid #365889;border-radius:999px;padding:6px 9px;background:#0b1d42;color:#cbd5e1;font-size:12px;cursor:pointer}`;
+  document.head.append(style);
+  const root = document.createElement('div');
+  root.innerHTML = `<button class="octopus-launch" type="button" aria-expanded="false" aria-controls="octopusPanel">🐙 Ask Octopus</button><section class="octopus-panel" id="octopusPanel" hidden aria-label="Octopus science helper"><div class="octopus-top"><b>🐙 Octopus Helper</b><button class="octopus-close" type="button" aria-label="Close Octopus Helper">×</button></div><div class="octopus-answer" aria-live="polite">Hi! I can help explain this science lesson, the 3D model, or the video controls.</div><form class="octopus-form"><input aria-label="Ask Octopus a question" placeholder="Ask about this lesson…"><button>Ask</button></form><div class="octopus-prompts"><button type="button" data-q="Explain this simply">Explain simply</button><button type="button" data-q="How do I use the video controls?">Video controls</button><button type="button" data-q="What should I look for?">What to look for</button></div></section>`;
+  document.body.append(root);
+  const launch=root.querySelector('.octopus-launch'), panel=root.querySelector('.octopus-panel'), close=root.querySelector('.octopus-close'), form=root.querySelector('form'), input=root.querySelector('input'), answer=root.querySelector('.octopus-answer');
+  function context(){const subject=document.getElementById('subject');const topic=document.getElementById('topic');return {subject:subject?.options?.[subject.selectedIndex]?.text || 'science',topic:topic?.value?.trim()};}
+  function reply(question){const q=question.toLowerCase(), c=context(), name=c.topic || c.subject;
+    if(/video|pause|rewind|progress|bar|control/.test(q)) return 'Use Play to start or pause. Drag the progress bar to jump anywhere in the lesson, and use ↶ 10s to rewind or 10s ↷ to move ahead.';
+    if(/3d|rotate|zoom|model/.test(q)) return 'In the 3D viewer, drag the model to rotate it and use your mouse wheel or trackpad to zoom. Start by identifying the largest structures, then connect each part to its job.';
+    if(/simple|easy/.test(q)) return name + ' is easier to understand when you look for the main parts first, then follow the arrows or order of steps. Ask yourself: what changes, and why?';
+    if(/look|find|notice/.test(q)) return 'Look for labels, arrows, repeated shapes, and anything that moves or changes. Those clues usually show the important structures and the process.';
+    return 'For ' + name + ', begin with the main object and its purpose. Then identify each labeled part, explain its job, and connect the parts into one process.';
+  }
+  function open(){panel.hidden=false;launch.setAttribute('aria-expanded','true');input.focus();}
+  function hide(){panel.hidden=true;launch.setAttribute('aria-expanded','false');launch.focus();}
+  launch.addEventListener('click',()=>panel.hidden?open():hide()); close.addEventListener('click',hide);
+  form.addEventListener('submit',e=>{e.preventDefault();const q=input.value.trim();if(!q)return;answer.textContent=reply(q);input.value='';});
+  root.querySelectorAll('[data-q]').forEach(b=>b.addEventListener('click',()=>{answer.textContent=reply(b.dataset.q);}));
+})();

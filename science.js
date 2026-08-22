@@ -1,11 +1,101 @@
-const canvas=document.getElementById('canvas'),file=document.getElementById('file'),drop=document.getElementById('drop'),subject=document.getElementById('subject'),topic=document.getElementById('topic'),stepsSelect=document.getElementById('steps'),generate=document.getElementById('generate'),status=document.getElementById('status'),result=document.getElementById('result');
-let img=null,sourceUrl=null,lessonSteps=[],lessonDuration=60,raf=0;
-const banks={general:['Introduce the diagram and scientific question','Identify important objects, labels, arrows, and relationships','Zoom in on the first major part and explain its role','Trace the process or relationship shown','Connect the parts and explain how the system works','Review the complete system and summarize the key idea'],biology:['Introduce the biological system and its purpose','Identify the major structures, organisms, tissues, or cells','Explain the function of each important structure','Trace the biological pathway or process','Connect structure to function and outcome','Review how the biological system works'],chemistry:['Introduce the chemical system and conditions','Identify atoms, molecules, ions, bonds, labels, and equipment','Explain the starting substances and their arrangement','Trace the reaction or chemical transformation','Explain what changed and what was produced','Review the chemistry from start to finish'],physics:['Introduce the physical system and quantity being demonstrated','Identify objects, forces, fields, waves, and components','Explain the starting state and important variables','Trace motion, energy, force, or signal flow','Connect the changes to the governing physical principle','Review the system and summarize the physics'],earth:['Introduce the Earth system and its scale','Identify layers, landforms, reservoirs, and materials','Explain the starting region or material','Trace movement, transfer, weathering, or circulation','Connect the local process to the larger Earth system','Review the Earth-science process'],astronomy:['Introduce the astronomical system and its scale','Identify objects, regions, labels, and positions','Focus on the most important object or region','Trace motion, interaction, formation, or evolution','Connect the objects to the larger astronomical process','Review the system and summarize the astronomy'],environment:['Introduce the ecosystem or environmental system','Identify organisms, resources, conditions, and flows','Explain the first important interaction','Trace energy, matter, population, or environmental change','Connect the interaction to broader consequences','Review the environmental relationship'],anatomy:['Introduce the body system and its function','Identify the major anatomical structures and labels','Explain each structure and its role','Trace the physiological pathway or process','Connect the structures to the system-level function','Review how the body system works']};
-function choose(f){if(!f||!f.type?.startsWith('image/'))return;if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=URL.createObjectURL(f);img=new Image();img.onload=()=>{status.textContent='Diagram loaded. Ready to create an all-science lesson video.';drawFrame(0,0)};img.src=sourceUrl}
-file.onchange=e=>choose(e.target.files[0]);drop.onclick=()=>file.click();drop.ondragover=e=>{e.preventDefault();drop.classList.add('active')};drop.ondragleave=()=>drop.classList.remove('active');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('active');choose(e.dataTransfer.files[0])};
-function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));return{w:r.width,h:r.height,d}}
-function drawFrame(elapsed,p){const{w,h,d}=resize(),c=canvas.getContext('2d');c.setTransform(d,0,0,d,0,0);c.fillStyle='#020817';c.fillRect(0,0,w,h);if(!img)return;const s=Math.min((w-48)/img.width,(h-175)/img.height),iw=img.width*s,ih=img.height*s,x=(w-iw)/2,y=25+(h-175-ih)/2;c.save();c.translate(w/2,h/2-55);c.rotate(Math.sin(elapsed/1800)*.025);c.translate(-iw/2,-ih/2);c.shadowColor='rgba(56,189,248,.35)';c.shadowBlur=28;c.drawImage(img,0,0,iw,ih);c.restore();for(let i=1;i<=8;i++){c.save();c.globalAlpha=.035;c.translate(i*3*Math.sin(elapsed/1600),i*2);c.strokeStyle='#7dd3fc';c.strokeRect(x,y,iw,ih);c.restore()}c.fillStyle='rgba(2,8,23,.94)';c.fillRect(0,h-132,w,132);const label=subject?.options?.[subject.selectedIndex]?.text||'General Science';c.fillStyle='#7dd3fc';c.font='700 14px Arial';c.fillText(`${label} · ${topic?.value?.trim()||'Science lesson'}`,24,h-103);const idx=Math.min(lessonSteps.length-1,Math.floor(p*lessonSteps.length));c.fillStyle='#fff';c.font='700 20px Arial';c.fillText(`Step ${idx+1}/${lessonSteps.length}`,24,h-72);c.font='500 17px Arial';c.fillText((lessonSteps[idx]||'Exploring the science diagram').slice(0,110),180,h-72);c.fillStyle='rgba(255,255,255,.18)';c.fillRect(24,h-37,w-48,6);c.fillStyle='#7dd3fc';c.fillRect(24,h-37,(w-48)*p,6)}
-function makeLesson(){const bank=banks[subject?.value]||banks.general,n=stepsSelect?.value==='auto'?6:Number(stepsSelect?.value||6);lessonSteps=[];for(let i=0;i<n;i++)lessonSteps.push(bank[i%bank.length]);if(topic?.value?.trim())lessonSteps[0]=`Introduce ${topic.value.trim()} and orient the viewer to the diagram`;lessonDuration=Math.max(30,Math.min(120,n*12))}
-function stop(){if(raf)cancelAnimationFrame(raf);raf=0}
-async function generateVideo(){if(!img){status.textContent='Please upload a science diagram first.';return}if(!('MediaRecorder'in window)||!canvas.captureStream){status.textContent='This browser cannot create local video. Try current Chrome or Edge.';return}makeLesson();stop();generate.disabled=true;result.innerHTML='';status.textContent=`Creating your ${lessonDuration}-second all-science lesson…`;try{const stream=canvas.captureStream(30),mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(x=>MediaRecorder.isTypeSupported(x))||'',rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:5000000}:{videoBitsPerSecond:5000000}),chunks=[];rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);const blob=await new Promise((resolve,reject)=>{rec.onerror=e=>reject(e.error||new Error('Video recording failed'));rec.onstop=()=>resolve(new Blob(chunks,{type:rec.mimeType||'video/webm'}));rec.start(200);const start=performance.now();const tick=now=>{const elapsed=now-start,p=Math.min(1,elapsed/(lessonDuration*1000));drawFrame(elapsed,p);status.textContent=`Creating video… ${Math.round(p*100)}%`;if(p<1)raf=requestAnimationFrame(tick);else{raf=0;rec.stop()}};raf=requestAnimationFrame(tick)});const url=URL.createObjectURL(blob),label=subject?.options?.[subject.selectedIndex]?.text||'Science';result.innerHTML=`<div class="video-card"><h3>${label} lesson video</h3><video class="video" controls playsinline src="${url}"></video><p>Generated locally in your browser. No paid video API and no WebGPU required.</p><a class="button" download="edulabs-science-lesson.webm" href="${url}">Save video</a></div>`;status.textContent='Video complete. Press play to watch your science lesson.'}catch(e){status.textContent=`Video generation failed: ${e.message||e}`}finally{generate.disabled=false}}
-generate.onclick=generateVideo;window.addEventListener('resize',()=>img&&drawFrame(0,0));status.textContent='Upload a science diagram to begin.';
+(() => {
+  const canvas = document.getElementById('lessonCanvas');
+  const file = document.getElementById('file');
+  const drop = document.getElementById('drop');
+  const subject = document.getElementById('subject');
+  const topic = document.getElementById('topic');
+  const play = document.getElementById('lessonPlay');
+  const back = document.getElementById('lessonBack');
+  const forward = document.getElementById('lessonForward');
+  const seek = document.getElementById('lessonSeek');
+  const time = document.getElementById('lessonTime');
+  const caption = document.getElementById('lessonCaption');
+  if (!canvas || !file || !play || !seek) return;
+
+  let image = null, sourceUrl = null, isPlaying = false, position = 0, lastFrame = 0, frame = 0;
+  const duration = 60;
+  const lessonBanks = {
+    general: ['Introduce the science diagram and the question it explores.', 'Identify the important objects, labels, arrows, and relationships.', 'Focus on the first major part and explain its job.', 'Trace the process or relationship shown in the diagram.', 'Connect the parts and explain how the system works.', 'Review the whole system and its key scientific idea.'],
+    biology: ['Introduce this biological system and its purpose.', 'Identify the major structures, organisms, tissues, or cells.', 'Explain how each important structure contributes.', 'Trace the biological pathway or process.', 'Connect structure to function and outcome.', 'Review how the biological system works.'],
+    chemistry: ['Introduce the chemical system and its conditions.', 'Identify atoms, molecules, bonds, labels, and equipment.', 'Explain the starting substances and their arrangement.', 'Trace the reaction or chemical transformation.', 'Explain what changed and what was produced.', 'Review the chemistry from start to finish.'],
+    physics: ['Introduce the physical system and quantity being demonstrated.', 'Identify objects, forces, fields, waves, and components.', 'Explain the starting state and important variables.', 'Trace motion, energy, force, or signal flow.', 'Connect changes to the governing physical principle.', 'Review the system and summarize the physics.']
+  };
+  function steps() {
+    const bank = lessonBanks[subject?.value] || lessonBanks.general;
+    const output = [...bank];
+    if (topic?.value?.trim()) output[0] = 'Introduce ' + topic.value.trim() + ' and orient the viewer to the diagram.';
+    return output;
+  }
+  function format(seconds) {
+    const value = Math.max(0, Math.min(duration, seconds));
+    return Math.floor(value / 60) + ':' + String(Math.floor(value % 60)).padStart(2, '0');
+  }
+  function resize() {
+    const rect = canvas.getBoundingClientRect(), scale = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(rect.width * scale));
+    canvas.height = Math.max(1, Math.round(rect.height * scale));
+    return { w: rect.width, h: rect.height, scale };
+  }
+  function draw() {
+    const { w, h, scale } = resize();
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.fillStyle = '#020817'; ctx.fillRect(0, 0, w, h);
+    if (!image) return;
+    const progress = position / duration, lessonSteps = steps();
+    const imageScale = Math.min((w - 48) / image.width, (h - 165) / image.height);
+    const iw = image.width * imageScale, ih = image.height * imageScale;
+    ctx.save();
+    ctx.translate(w / 2, h / 2 - 45);
+    ctx.scale(1 + Math.sin(position * .7) * .015, 1 + Math.sin(position * .7) * .015);
+    ctx.translate(-iw / 2, -ih / 2);
+    ctx.shadowColor = 'rgba(56,189,248,.4)'; ctx.shadowBlur = 26; ctx.drawImage(image, 0, 0, iw, ih); ctx.restore();
+    ctx.fillStyle = 'rgba(2,8,23,.94)'; ctx.fillRect(0, h - 125, w, 125);
+    const index = Math.min(lessonSteps.length - 1, Math.floor(progress * lessonSteps.length));
+    const label = subject?.options?.[subject.selectedIndex]?.text || 'General Science';
+    ctx.fillStyle = '#7dd3fc'; ctx.font = '700 14px Arial'; ctx.fillText(label + ' · Animated lesson', 24, h - 92);
+    ctx.fillStyle = '#fff'; ctx.font = '700 20px Arial'; ctx.fillText('Step ' + (index + 1) + '/' + lessonSteps.length, 24, h - 60);
+    ctx.font = '500 16px Arial'; ctx.fillText(lessonSteps[index].slice(0, 90), 150, h - 60);
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(24, h - 27, w - 48, 7);
+    ctx.fillStyle = '#38bdf8'; ctx.fillRect(24, h - 27, (w - 48) * progress, 7);
+    caption.textContent = lessonSteps[index];
+  }
+  function updateUi() {
+    seek.value = Math.round(position / duration * 1000);
+    time.textContent = format(position) + ' / ' + format(duration);
+    play.textContent = isPlaying ? '❚❚ Pause' : '▶ Play';
+    play.setAttribute('aria-label', isPlaying ? 'Pause lesson' : 'Play lesson');
+  }
+  function render() { draw(); updateUi(); }
+  function tick(now) {
+    if (!isPlaying) return;
+    if (lastFrame) position += (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (position >= duration) { position = duration; isPlaying = false; lastFrame = 0; }
+    render();
+    if (isPlaying) frame = requestAnimationFrame(tick);
+  }
+  function setPlaying(value) {
+    if (!image) { caption.textContent = 'Upload a science image before starting the lesson.'; return; }
+    if (position >= duration) position = 0;
+    isPlaying = value; lastFrame = 0;
+    if (isPlaying) { cancelAnimationFrame(frame); frame = requestAnimationFrame(tick); }
+    render();
+  }
+  function loadImage(selected) {
+    if (!selected || !selected.type.startsWith('image/')) return;
+    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+    sourceUrl = URL.createObjectURL(selected);
+    image = new Image();
+    image.onload = () => { position = 0; isPlaying = false; caption.textContent = 'Lesson ready. Press Play or drag the progress bar to explore.'; render(); };
+    image.src = sourceUrl;
+  }
+  file.addEventListener('change', event => loadImage(event.target.files[0]));
+  drop?.addEventListener('drop', event => { const selected = event.dataTransfer?.files?.[0]; if (selected) loadImage(selected); });
+  play.addEventListener('click', () => setPlaying(!isPlaying));
+  back.addEventListener('click', () => { position = Math.max(0, position - 10); render(); });
+  forward.addEventListener('click', () => { position = Math.min(duration, position + 10); render(); });
+  seek.addEventListener('input', () => { position = Number(seek.value) / 1000 * duration; render(); });
+  window.addEventListener('resize', render);
+  render();
+})();

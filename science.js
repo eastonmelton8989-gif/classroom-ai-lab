@@ -20,6 +20,8 @@
   const lessonLoadingTitle = document.getElementById('lessonLoadingTitle');
   const lessonLoadingPercent = document.getElementById('lessonLoadingPercent');
   const lessonLoadingDetail = document.getElementById('lessonLoadingDetail');
+  const imageSelected = document.getElementById('imageSelected');
+  const lessonPlayer = document.querySelector('.lesson-player');
   if (!canvas || !file || !play || !seek) return;
 
   let image = null, sourceUrl = null, isPlaying = false, position = 0, lastFrame = 0, frame = 0, announcedStep = -1;
@@ -185,6 +187,7 @@
   function adjustZoom(change) { zoom = Math.max(.75, Math.min(3, +(zoom + change).toFixed(2))); render(); }
   function loadImage(selected) {
     if (!selected || !selected.type.startsWith('image/')) return;
+    if (imageSelected) imageSelected.textContent = 'Picture selected: ' + selected.name + '. Loading your animated lesson now…';
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     sourceUrl = URL.createObjectURL(selected);
     image = new Image();
@@ -192,7 +195,10 @@
       position = 0; isPlaying = false; announcedStep = -1; resetZoom();
       setLessonLoading(20, 'Picture received!', 'Preparing the animated lesson from your image…');
       caption.textContent = 'Picture loaded. The free AI is now looking at it.';
-      render(); analyzeImage();
+      if (imageSelected) imageSelected.textContent = 'Picture loaded: ' + selected.name + '. The animated lesson is ready below.';
+      render();
+      lessonPlayer?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      analyzeImage();
     };
     image.src = sourceUrl;
   }
@@ -200,7 +206,9 @@
     if (!selected || !selected.type.startsWith('image/')) { caption.textContent = 'Please choose a PNG, JPG, WEBP, or another image file.'; return; }
     loadImage(selected);
   }
-  file.addEventListener('change', event => selectImage(event.target.files[0]));
+  const pickSelectedImage = event => selectImage(event.target.files?.[0]);
+  file.addEventListener('change', pickSelectedImage);
+  file.addEventListener('input', pickSelectedImage);
   drop?.addEventListener('dragover', event => { event.preventDefault(); drop.classList.add('active'); });
   drop?.addEventListener('dragleave', () => drop.classList.remove('active'));
   drop?.addEventListener('drop', event => { event.preventDefault(); drop.classList.remove('active'); selectImage(event.dataTransfer?.files?.[0]); });

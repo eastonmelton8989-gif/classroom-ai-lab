@@ -1,1 +1,65 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Video Lab · EduLabs AI</title><link rel="stylesheet" href="styles.css"></head><body><header class="nav"><a class="brand" href="index.html">⚗ <span>EduLabs AI</span></a><nav><a href="index.html">Home</a><a href="video.html">Video Lab</a><a href="science.html">3D Science Lab</a></nav></header><main class="lab"><a class="toplink" href="index.html">← Back home</a><h1>Video Lab</h1><p>Paste or drag a YouTube URL to test whether the video can be displayed through supported embedding. This tool does not bypass school or network filters.</p><section class="panel"><div class="drop" id="drop"><div style="font-size:40px">🎬</div><b>Paste a YouTube URL here or drag it into this box</b><div class="small">You can also use Ctrl+V anywhere on this page.</div></div><div id="status" class="status">Waiting for a YouTube URL.</div><div id="player"></div><div id="share"></div></section></main><footer>EduLabs AI · Classroom video accessibility demo · 2026</footer><script>const drop=document.getElementById('drop'),status=document.getElementById('status'),player=document.getElementById('player'),share=document.getElementById('share');function id(s){try{const u=new URL(s);if(u.hostname.includes('youtu.be'))return u.pathname.slice(1).split('/')[0];if(u.hostname.includes('youtube.com'))return u.searchParams.get('v')||u.pathname.split('/').pop()}catch{}return null}function load(s){const v=id(s.trim());if(!v){status.textContent='That does not look like a YouTube URL.';return}status.textContent='Loaded supported embed preview. If embedding is disabled for this video, YouTube may show an error.';player.innerHTML='<div style="margin-top:18px;aspect-ratio:16/9"><iframe style="width:100%;height:100%;border:0;border-radius:16px" src="https://www.youtube.com/embed/'+encodeURIComponent(v)+'" title="YouTube video" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div>';const url=location.origin+location.pathname+'?v='+encodeURIComponent(v);share.innerHTML='<div class="share"><b>Share this page</b><input readonly value="'+url+'" onclick="this.select()"></div>'}drop.ondragover=e=>e.preventDefault();drop.ondrop=e=>{e.preventDefault();const text=e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain');if(text)load(text)};document.addEventListener('paste',e=>{const text=e.clipboardData.getData('text');if(text&&text.includes('youtu'))load(text)});const q=new URLSearchParams(location.search).get('v');if(q)load('https://youtube.com/watch?v='+q);</script><script src="octopus-helper.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video Lab · EduLabs AI</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.video-progress{display:none;margin:18px 0;padding:15px;border:1px solid #24416f;background:#07152f;border-radius:14px}.video-progress.show{display:block}.video-progress-head{display:flex;justify-content:space-between;gap:12px;color:#dbeafe;font-weight:700}.video-track{height:10px;background:#182a4b;border-radius:999px;overflow:hidden;margin-top:10px}.video-fill{height:100%;width:0;background:#4c8dff;border-radius:999px;transition:width .35s ease}.video-detail{margin-top:8px;color:#9fb3d9;font-size:13px}.image-player{display:none;margin-top:20px;border:1px solid #24416f;border-radius:16px;padding:14px;background:#020817}.image-player.show{display:block}.image-player canvas{width:100%;height:430px;display:block;border-radius:12px;background:#000}.image-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}.image-controls input{flex:1;min-width:140px;accent-color:#4c8dff}.image-caption{color:#dbeafe;margin-top:10px;font-weight:600;min-height:24px}@media(max-width:760px){.image-player canvas{height:300px}}
+</style>
+</head>
+<body>
+<header class="nav"><a class="brand" href="index.html">⚗ <span>EduLabs AI</span></a><nav><a href="index.html">Home</a><a href="video.html">Video Lab</a><a href="science.html">3D Science Lab</a></nav></header>
+<main class="lab">
+<a class="toplink" href="index.html">← Back home</a>
+<h1>Video Lab</h1>
+<p>Upload a picture and EduLabs makes a free interactive visual lesson from your actual image. It has play, pause, rewind, a timeline, and narration.</p>
+<section class="panel">
+<div class="drop" id="drop"><div style="font-size:40px">🎬</div><b>Choose an image or drag one here</b><div class="small">PNG, JPG, WEBP · Your image stays in this browser for the video lesson</div><input id="videoFile" type="file" accept="image/*"></div>
+<div class="video-progress" id="videoProgress" role="status" aria-live="polite"><div class="video-progress-head"><span id="videoProgressTitle">Getting ready…</span><span id="videoPercent">0%</span></div><div class="video-track"><div class="video-fill" id="videoFill"></div></div><div class="video-detail" id="videoDetail">Waiting for an image.</div></div>
+<div id="status" class="status">Choose a picture to make a visual lesson.</div>
+<div class="image-player" id="imagePlayer"><canvas id="videoCanvas" aria-label="Image-based visual lesson"></canvas><div class="image-controls"><button class="btn" id="videoPlay" type="button">▶ Play</button><button class="btn" id="videoBack" type="button">↶ 10s</button><button class="btn" id="videoForward" type="button">10s ↷</button><input id="videoSeek" type="range" min="0" max="1000" value="0" aria-label="Video timeline"><span id="videoTime" class="small">0:00 / 0:45</span></div><div class="image-caption" id="videoCaption">Your visual lesson will appear here.</div></div>
+</section>
+</main>
+<footer>EduLabs AI · Free browser-based visual lessons · 2026</footer>
+<script>
+(() => {
+  const file = document.getElementById('videoFile'), progress = document.getElementById('videoProgress'), fill = document.getElementById('videoFill'), percent = document.getElementById('videoPercent'), progressTitle = document.getElementById('videoProgressTitle'), detail = document.getElementById('videoDetail'), status = document.getElementById('status'), player = document.getElementById('imagePlayer'), canvas = document.getElementById('videoCanvas'), play = document.getElementById('videoPlay'), back = document.getElementById('videoBack'), forward = document.getElementById('videoForward'), seek = document.getElementById('videoSeek'), time = document.getElementById('videoTime'), caption = document.getElementById('videoCaption');
+  let image, source, playing = false, position = 0, lastFrame = 0, animation, spoken = -1;
+  const duration = 45;
+  const lines = ['Let’s start with the whole picture. Notice the main shape and how the important details are arranged.', 'Now look more closely at the center. Use the timeline to pause here and inspect the details in your own image.', 'Next, scan outward. Look for labels, arrows, borders, or connected pieces that help explain the idea.', 'Here is the key point: a good science explanation connects what you can see with what that part does.', 'Let’s wrap up. Replay any section and use the image as evidence while you explain the concept in your own words.'];
+  function setProgress(value, title, text) { progress.classList.add('show'); fill.style.width = value + '%'; percent.textContent = value + '%'; progressTitle.textContent = title; detail.textContent = text; }
+  function format(value) { return Math.floor(value / 60) + ':' + String(Math.floor(value % 60)).padStart(2, '0'); }
+  function speak(text) { if (!('speechSynthesis' in window)) return; speechSynthesis.cancel(); const voice = new SpeechSynthesisUtterance(text); const voices = speechSynthesis.getVoices(); voice.voice = voices.find(v => /^en-US/i.test(v.lang) && /natural|aria|jenny|zira|samantha/i.test(v.name)) || voices.find(v => /^en/i.test(v.lang)) || null; voice.rate = .86; voice.pitch = .98; speechSynthesis.speak(voice); }
+  function draw() {
+    const rect = canvas.getBoundingClientRect(), scale = Math.min(devicePixelRatio || 1, 2), w = rect.width, h = rect.height;
+    canvas.width = Math.max(1, Math.round(w * scale)); canvas.height = Math.max(1, Math.round(h * scale));
+    const ctx = canvas.getContext('2d'); ctx.setTransform(scale,0,0,scale,0,0); ctx.fillStyle = '#000'; ctx.fillRect(0,0,w,h);
+    if (!image) return;
+    const step = Math.min(lines.length - 1, Math.floor(position / duration * lines.length));
+    const base = Math.max(w / image.width, h / image.height), zoom = 1.04 + position / duration * .18;
+    const iw = image.width * base * zoom, ih = image.height * base * zoom;
+    const shiftX = Math.sin(position * .18) * w * .06, shiftY = Math.cos(position * .14) * h * .035;
+    ctx.save(); ctx.translate(w/2 + shiftX, h/2 + shiftY); ctx.drawImage(image, -iw/2, -ih/2, iw, ih); ctx.restore();
+    ctx.fillStyle = 'rgba(2,8,23,.82)'; ctx.fillRect(0,h-105,w,105); ctx.fillStyle = '#93c5fd'; ctx.font = '700 14px Arial'; ctx.fillText('YOUR IMAGE · VISUAL LESSON',20,h-76); ctx.fillStyle = '#fff'; ctx.font = '700 18px Arial'; ctx.fillText('Part ' + (step + 1) + ' of ' + lines.length,20,h-48); ctx.font = '500 15px Arial'; 
+    const words = lines[step].split(' '); let line='', y=h-25; for(const word of words){const next=line?line+' '+word:word;if(ctx.measureText(next).width>w-40&&line){ctx.fillText(line,20,y);y+=18;line=word}else line=next} ctx.fillText(line,20,y);
+    caption.textContent = lines[step]; seek.value = Math.round(position / duration * 1000); time.textContent = format(position) + ' / ' + format(duration);
+    if (playing && step !== spoken) { spoken = step; speak(lines[step]); }
+  }
+  function tick(now) { if (!playing) return; if (lastFrame) position += (now-lastFrame)/1000; lastFrame=now; if(position>=duration){position=duration;playing=false;lastFrame=0;speechSynthesis.cancel()} draw(); play.textContent=playing?'❚❚ Pause':'▶ Play'; if(playing) animation=requestAnimationFrame(tick); }
+  function setPlaying(value) { if(!image) return; if(position>=duration) position=0; playing=value; lastFrame=0; if(!playing) speechSynthesis.cancel(); if(playing){cancelAnimationFrame(animation);animation=requestAnimationFrame(tick)} play.textContent=playing?'❚❚ Pause':'▶ Play';draw(); }
+  function build(selected) {
+    if(!selected || !selected.type.startsWith('image/')) { status.textContent='Please choose an image file.'; return; }
+    setProgress(10,'Image received','Reading your image safely in this browser…'); status.textContent='Image received. Preparing your visual lesson…';
+    if(source) URL.revokeObjectURL(source); source=URL.createObjectURL(selected);
+    image=new Image();
+    image.onload=()=>{setProgress(45,'Planning the lesson','Creating the timeline and picture motion…');setTimeout(()=>{setProgress(75,'Preparing narration','Adding the spoken explanation and controls…');setTimeout(()=>{setProgress(100,'Your visual lesson is ready!','Press Play, use the timeline, or rewind any time.');player.classList.add('show');position=0;spoken=-1;draw();status.textContent='Ready. This lesson uses your uploaded image.'},350)},350)};
+    image.onerror=()=>{setProgress(0,'Could not read image','Try another PNG, JPG, or WEBP image.');status.textContent='That image could not be loaded.'};
+    image.src=source;
+  }
+  file.addEventListener('change', e=>build(e.target.files[0]));
+  play.addEventListener('click',()=>setPlaying(!playing)); back.addEventListener('click',()=>{position=Math.max(0,position-10);draw()}); forward.addEventListener('click',()=>{position=Math.min(duration,position+10);draw()}); seek.addEventListener('input',()=>{position=Number(seek.value)/1000*duration;draw()}); window.addEventListener('resize',draw);
+})();
+</script><script src="octopus-helper.js"></script>
+</body></html>

@@ -1,3 +1,7 @@
+export const config = {
+  api: { bodyParser: false }
+};
+
 // EduLabs AI Science Lab — Image-to-3D API bridge
 // Supports hosted AI generation while keeping the local worker option available.
 

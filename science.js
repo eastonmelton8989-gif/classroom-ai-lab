@@ -11,9 +11,15 @@
   const seek = document.getElementById('lessonSeek');
   const time = document.getElementById('lessonTime');
   const caption = document.getElementById('lessonCaption');
+  const zoomIn = document.getElementById('imageZoomIn');
+  const zoomOut = document.getElementById('imageZoomOut');
+  const zoomReset = document.getElementById('imageZoomReset');
+  const zoomReadout = document.getElementById('imageZoomReadout');
   if (!canvas || !file || !play || !seek) return;
 
   let image = null, sourceUrl = null, isPlaying = false, position = 0, lastFrame = 0, frame = 0, announcedStep = -1;
+  let zoom = 1, panX = 0, panY = 0, dragging = false, pointerX = 0, pointerY = 0;
+  let analysis = null, analysisInProgress = false, classifier = null;
   const duration = 60;
   const lessonBanks = {
     general: ['Introduce the science diagram and the question it explores.', 'Identify the important objects, labels, arrows, and relationships.', 'Focus on the first major part and explain its job.', 'Trace the process or relationship shown in the diagram.', 'Connect the parts and explain how the system works.', 'Review the whole system and its key scientific idea.'],
@@ -31,25 +37,31 @@
     atom: 'An atom has a tiny dense nucleus surrounded by electrons. The number and arrangement of its particles help determine its properties.',
     heart: 'The heart is a muscular pump. Its chambers and valves work together to keep blood moving in one direction.'
   };
+
+  function cSubject() { return subject?.options?.[subject.selectedIndex]?.text || 'this science system'; }
+  function imageClue() {
+    if (analysisInProgress) return 'I am still looking at the uploaded picture, so give me one moment before pressing Play.';
+    if (!analysis?.labels?.length) return 'I can see the uploaded picture. If you tell me the topic or key parts, I can make the explanation even more specific.';
+    return 'My image scan notices ' + analysis.labels.join(', ') + '. I will use that visual clue alongside your science topic, but you should always compare it with the labels in the picture.';
+  }
   function steps() {
     const bank = lessonBanks[subject?.value] || lessonBanks.general;
     const focus = topic?.value?.trim() || cSubject();
     const output = bank.map((line, index) => {
-      const openings = ['Let’s begin by getting oriented.', 'Now slow down and look carefully.', 'Here is the important part.', 'Next, follow the change or movement.', 'Now connect the evidence.', 'To finish, bring the whole idea together.'];
-      return openings[index] + ' ' + line + ' Think about how this relates to ' + focus + '.';
+      const openings = ['Let’s begin by getting oriented.', 'Now, let’s slow down and look closely.', 'This is the part worth pausing on.', 'Next, watch how the action moves through the picture.', 'Here is where the pieces start to connect.', 'Let’s bring the idea together.'];
+      return openings[index] + ' ' + line + ' Keep ' + focus + ' in mind as you look at the image.';
     });
-    output[0] = 'Welcome. We are exploring ' + focus + '. Start with the largest shapes and labels. Before memorizing names, notice how the parts are arranged and what appears to move, change, or connect.';
+    output[0] = 'Hey, welcome in. We are looking at ' + focus + '. ' + imageClue() + ' Start with the biggest shapes, arrows, and labels. Do not rush to memorize names yet; first notice what is connected to what.';
     const namedParts = (parts?.value || '').split(',').map(value => value.trim()).filter(Boolean);
     if (namedParts.length) {
       namedParts.slice(0, 4).forEach((part, index) => {
-        const fact = partFacts[part.toLowerCase()] || ('Locate ' + part + '. Notice its position, shape, and connections to nearby structures. Those clues help explain its job in ' + focus + '.');
-        output[Math.min(index + 1, output.length - 2)] = 'Let’s focus on ' + part + '. ' + fact + ' In the model, rotate and zoom in so you can see how it relates to the surrounding parts.';
+        const fact = partFacts[part.toLowerCase()] || ('Find ' + part + ' in the picture. Look at its shape, where it sits, and what it touches. Those details are usually the best clue to its role in ' + focus + '.');
+        output[Math.min(index + 1, output.length - 2)] = 'Let’s zoom in on ' + part + '. ' + fact + ' Take a second to connect that explanation to what you can actually see around it.';
       });
     }
-    output[output.length - 1] = 'Let’s review ' + focus + '. The key is not just naming the parts. Explain how each part contributes to the larger system or process, then use the model to check that story one more time.';
+    output[output.length - 1] = 'Here is the takeaway for ' + focus + ': the point is not only to name each part. The important part is explaining how the parts work together. Use the zoom controls to revisit anything that was hard to see, and replay a section whenever you need it.';
     return output;
   }
-  function cSubject() { return subject?.options?.[subject.selectedIndex]?.text || 'this science system'; }
   function speak(text) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
@@ -58,9 +70,31 @@
     const preferred = voices.find(voice => /^en-US/i.test(voice.lang) && /natural|aria|jenny|zira|samantha/i.test(voice.name))
       || voices.find(voice => /^en/i.test(voice.lang));
     if (preferred) message.voice = preferred;
-    message.rate = 0.84;
-    message.pitch = 0.96;
+    message.rate = 0.86;
+    message.pitch = 0.98;
+    message.volume = 1;
     window.speechSynthesis.speak(message);
+  }
+  async function analyzeImage() {
+    if (!sourceUrl || analysisInProgress) return;
+    analysisInProgress = true;
+    analysis = null;
+    caption.textContent = 'Looking at your image with the free on-device AI…';
+    render();
+    try {
+      const transformers = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+      classifier ||= await transformers.pipeline('image-classification', 'Xenova/vit-base-patch16-224');
+      const results = await classifier(sourceUrl, { topk: 3 });
+      const labels = results.map(item => String(item.label || '').replace(/_/g, ' ')).filter(Boolean);
+      analysis = { labels };
+      caption.textContent = labels.length ? 'Image analyzed: I noticed ' + labels.join(', ') + '. Press Play for the detailed lesson.' : 'Image scan finished. Press Play for the detailed lesson.';
+    } catch (error) {
+      console.warn('Image analysis unavailable:', error);
+      caption.textContent = 'Your picture is ready. Add a topic or key parts for a more specific explanation.';
+    } finally {
+      analysisInProgress = false;
+      render();
+    }
   }
   function format(seconds) {
     const value = Math.max(0, Math.min(duration, seconds));
@@ -72,6 +106,15 @@
     canvas.height = Math.max(1, Math.round(rect.height * scale));
     return { w: rect.width, h: rect.height, scale };
   }
+  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' '); let line = '', lines = [];
+    words.forEach(word => {
+      const next = line ? line + ' ' + word : word;
+      if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; } else line = next;
+    });
+    if (line) lines.push(line);
+    lines.slice(0, 2).forEach((value, index) => ctx.fillText(value, x, y + index * lineHeight));
+  }
   function draw() {
     const { w, h, scale } = resize();
     const ctx = canvas.getContext('2d');
@@ -79,26 +122,26 @@
     ctx.fillStyle = '#020817'; ctx.fillRect(0, 0, w, h);
     if (!image) return;
     const progress = position / duration, lessonSteps = steps();
-    const imageScale = Math.min((w - 48) / image.width, (h - 165) / image.height);
+    const baseScale = Math.min((w - 48) / image.width, (h - 165) / image.height);
+    const imageScale = baseScale * zoom;
     const iw = image.width * imageScale, ih = image.height * imageScale;
     ctx.save();
-    ctx.translate(w / 2, h / 2 - 45);
-    ctx.scale(1 + Math.sin(position * .7) * .015, 1 + Math.sin(position * .7) * .015);
+    ctx.beginPath(); ctx.rect(0, 0, w, h - 125); ctx.clip();
+    ctx.translate(w / 2 + panX, h / 2 - 45 + panY);
+    ctx.scale(1 + Math.sin(position * .7) * .008, 1 + Math.sin(position * .7) * .008);
     ctx.translate(-iw / 2, -ih / 2);
     ctx.shadowColor = 'rgba(56,189,248,.4)'; ctx.shadowBlur = 26; ctx.drawImage(image, 0, 0, iw, ih); ctx.restore();
     ctx.fillStyle = 'rgba(2,8,23,.94)'; ctx.fillRect(0, h - 125, w, 125);
     const index = Math.min(lessonSteps.length - 1, Math.floor(progress * lessonSteps.length));
     const label = subject?.options?.[subject.selectedIndex]?.text || 'General Science';
-    ctx.fillStyle = '#7dd3fc'; ctx.font = '700 14px Arial'; ctx.fillText(label + ' · Animated lesson', 24, h - 92);
-    ctx.fillStyle = '#fff'; ctx.font = '700 20px Arial'; ctx.fillText('Step ' + (index + 1) + '/' + lessonSteps.length, 24, h - 60);
-    ctx.font = '500 16px Arial'; ctx.fillText(lessonSteps[index].slice(0, 90), 150, h - 60);
+    ctx.fillStyle = '#7dd3fc'; ctx.font = '700 14px Arial'; ctx.fillText(label + ' · Image-guided lesson', 24, h - 92);
+    ctx.fillStyle = '#fff'; ctx.font = '700 19px Arial'; ctx.fillText('Step ' + (index + 1) + '/' + lessonSteps.length, 24, h - 63);
+    ctx.font = '500 15px Arial'; drawWrappedText(ctx, lessonSteps[index], 150, h - 75, w - 174, 20);
     ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(24, h - 27, w - 48, 7);
     ctx.fillStyle = '#38bdf8'; ctx.fillRect(24, h - 27, (w - 48) * progress, 7);
     caption.textContent = lessonSteps[index];
-    if (isPlaying && index !== announcedStep) {
-      announcedStep = index;
-      speak(lessonSteps[index]);
-    }
+    if (zoomReadout) zoomReadout.textContent = Math.round(zoom * 100) + '%';
+    if (isPlaying && index !== announcedStep) { announcedStep = index; speak(lessonSteps[index]); }
   }
   function updateUi() {
     seek.value = Math.round(position / duration * 1000);
@@ -123,19 +166,22 @@
     if (isPlaying) { cancelAnimationFrame(frame); frame = requestAnimationFrame(tick); }
     render();
   }
+  function resetZoom() { zoom = 1; panX = 0; panY = 0; render(); }
+  function adjustZoom(change) { zoom = Math.max(.75, Math.min(3, +(zoom + change).toFixed(2))); render(); }
   function loadImage(selected) {
     if (!selected || !selected.type.startsWith('image/')) return;
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     sourceUrl = URL.createObjectURL(selected);
     image = new Image();
-    image.onload = () => { position = 0; isPlaying = false; announcedStep = -1; caption.textContent = 'Lesson ready. Press Play or drag the progress bar to explore.'; render(); };
+    image.onload = () => {
+      position = 0; isPlaying = false; announcedStep = -1; resetZoom();
+      caption.textContent = 'Picture loaded. The free AI is now looking at it.';
+      render(); analyzeImage();
+    };
     image.src = sourceUrl;
   }
   function selectImage(selected) {
-    if (!selected || !selected.type.startsWith('image/')) {
-      caption.textContent = 'Please choose a PNG, JPG, WEBP, or another image file.';
-      return;
-    }
+    if (!selected || !selected.type.startsWith('image/')) { caption.textContent = 'Please choose a PNG, JPG, WEBP, or another image file.'; return; }
     loadImage(selected);
   }
   file.addEventListener('change', event => selectImage(event.target.files[0]));
@@ -147,6 +193,14 @@
   back.addEventListener('click', () => { position = Math.max(0, position - 10); render(); });
   forward.addEventListener('click', () => { position = Math.min(duration, position + 10); render(); });
   seek.addEventListener('input', () => { position = Number(seek.value) / 1000 * duration; render(); });
+  zoomIn?.addEventListener('click', () => adjustZoom(.25));
+  zoomOut?.addEventListener('click', () => adjustZoom(-.25));
+  zoomReset?.addEventListener('click', resetZoom);
+  canvas.addEventListener('wheel', event => { if (!image) return; event.preventDefault(); adjustZoom(event.deltaY < 0 ? .12 : -.12); }, { passive: false });
+  canvas.addEventListener('pointerdown', event => { if (!image) return; dragging = true; pointerX = event.clientX; pointerY = event.clientY; canvas.setPointerCapture?.(event.pointerId); canvas.classList.add('dragging'); });
+  canvas.addEventListener('pointermove', event => { if (!dragging) return; panX += event.clientX - pointerX; panY += event.clientY - pointerY; pointerX = event.clientX; pointerY = event.clientY; render(); });
+  const endDrag = () => { dragging = false; canvas.classList.remove('dragging'); };
+  canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
   window.addEventListener('resize', render);
   render();
 })();

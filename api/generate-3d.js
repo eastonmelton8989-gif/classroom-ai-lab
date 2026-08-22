@@ -1,7 +1,3 @@
-export const config = {
-  api: { bodyParser: false }
-};
-
 // EduLabs AI Science Lab — Image-to-3D API bridge
 // Supports hosted AI generation while keeping the local worker option available.
 
@@ -23,8 +19,8 @@ export default async function handler(req, res) {
     });
   }
 
-  const contentType = req.headers['content-type'] || '';
-  if (!contentType.startsWith('multipart/form-data')) {
+  const imageBase64 = req.body?.imageBase64;
+  if (typeof imageBase64 !== 'string' || !imageBase64.startsWith('data:image/')) {
     return res.status(400).json({
       error: 'An image upload is required'
     });
@@ -39,12 +35,11 @@ export default async function handler(req, res) {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'content-type': contentType,
+          'content-type': 'application/json',
           accept: 'application/json',
           ...(workerToken ? { authorization: `Bearer ${workerToken}` } : {})
         },
-        body: req,
-        duplex: 'half',
+        body: JSON.stringify({ imageBase64 }),
         signal: controller.signal
       });
 

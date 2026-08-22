@@ -185,7 +185,6 @@
     loadImage(selected);
   }
   file.addEventListener('change', event => selectImage(event.target.files[0]));
-  drop?.addEventListener('click', () => file.click());
   drop?.addEventListener('dragover', event => { event.preventDefault(); drop.classList.add('active'); });
   drop?.addEventListener('dragleave', () => drop.classList.remove('active'));
   drop?.addEventListener('drop', event => { event.preventDefault(); drop.classList.remove('active'); selectImage(event.dataTransfer?.files?.[0]); });

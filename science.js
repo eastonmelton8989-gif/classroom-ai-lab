@@ -40,7 +40,7 @@
     mitochondria: 'Mitochondria release usable energy from food molecules. Cells with high energy needs often contain many mitochondria.',
     chloroplast: 'Chloroplasts capture light energy. In plant cells, they use that energy to help make sugars through photosynthesis.',
     ribosome: 'Ribosomes assemble proteins. Proteins are used to build structures, carry messages, and support many chemical reactions.',
-    cell wall: 'The cell wall gives a plant cell extra strength and shape. It sits outside the cell membrane.',
+    'cell wall': 'The cell wall gives a plant cell extra strength and shape. It sits outside the cell membrane.',
     atom: 'An atom has a tiny dense nucleus surrounded by electrons. The number and arrangement of its particles help determine its properties.',
     heart: 'The heart is a muscular pump. Its chambers and valves work together to keep blood moving in one direction.'
   };

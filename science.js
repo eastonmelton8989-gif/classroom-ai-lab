@@ -26,7 +26,7 @@
 
   let image = null, sourceUrl = null, isPlaying = false, position = 0, lastFrame = 0, frame = 0, announcedStep = -1;
   let zoom = 1, panX = 0, panY = 0, dragging = false, pointerX = 0, pointerY = 0;
-  let analysis = null, analysisInProgress = false, classifier = null;
+  let analysis = null, analysisInProgress = false, classifier = null, aiLesson = null;
   const duration = 60;
   const lessonBanks = {
     general: ['Introduce the science diagram and the question it explores.', 'Identify the important objects, labels, arrows, and relationships.', 'Focus on the first major part and explain its job.', 'Trace the process or relationship shown in the diagram.', 'Connect the parts and explain how the system works.', 'Review the whole system and its key scientific idea.'],
@@ -61,6 +61,7 @@
   function steps() {
     const bank = lessonBanks[subject?.value] || lessonBanks.general;
     const focus = topic?.value?.trim() || cSubject();
+    if (Array.isArray(aiLesson) && aiLesson.length) return aiLesson;
     const output = bank.map((line, index) => {
       const openings = ['Let’s begin by getting oriented.', 'Now, let’s slow down and look closely.', 'This is the part worth pausing on.', 'Next, watch how the action moves through the picture.', 'Here is where the pieces start to connect.', 'Let’s bring the idea together.'];
       return openings[index] + ' ' + line + ' Keep ' + focus + ' in mind as you look at the image.';
@@ -93,21 +94,48 @@
     if (!sourceUrl || analysisInProgress) return;
     analysisInProgress = true;
     analysis = null;
-    setLessonLoading(45, 'Analyzing picture…', 'The free on-device AI is looking at the image.');
-    caption.textContent = 'Looking at your image with the free on-device AI…';
+    aiLesson = null;
+    setLessonLoading(45, 'Analyzing picture…', 'The school AI is studying your image and building a lesson.');
+    caption.textContent = 'The school AI is studying your image…';
     render();
+    const focus = topic?.value?.trim() || cSubject();
+    const namedParts = (parts?.value || '').trim() || 'any important visible parts';
     try {
-      const transformers = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
-      classifier ||= await transformers.pipeline('image-classification', 'Xenova/vit-base-patch16-224');
-      const results = await classifier(sourceUrl, { topk: 3 });
-      const labels = results.map(item => String(item.label || '').replace(/_/g, ' ')).filter(Boolean);
-      analysis = { labels };
-      setLessonLoading(100, 'Lesson ready!', labels.length ? 'Image scan finished. Press Play to hear the explanation.' : 'Picture is ready. Press Play to hear the explanation.');
-      caption.textContent = labels.length ? 'Image analyzed: I noticed ' + labels.join(', ') + '. Press Play for the detailed lesson.' : 'Image scan finished. Press Play for the detailed lesson.';
-    } catch (error) {
-      console.warn('Image analysis unavailable:', error);
-      setLessonLoading(100, 'Lesson ready!', 'Your picture is loaded. Add a topic or key parts for a more specific explanation.');
-      caption.textContent = 'Your picture is ready. Add a topic or key parts for a more specific explanation.';
+      const response = await fetch('/api/ai-tutor', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: window.eduLabsLessonImage,
+          prompt: 'Study this science image for a student learning ' + focus + '. '
+            + 'Focus on ' + namedParts + '. Return only a JSON array of exactly 5 detailed, friendly lesson segments. '
+            + 'Each segment should explain what is visibly present and its scientific meaning. Never invent labels that cannot be seen.'
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'The school AI could not read the image.');
+      const match = String(data.answer || '').match(/\[[\s\S]*\]/);
+      const parsed = match ? JSON.parse(match[0]) : null;
+      if (!Array.isArray(parsed) || parsed.length < 3) throw new Error('The school AI returned an incomplete lesson.');
+      aiLesson = parsed.slice(0, 5).map(item => String(item).trim()).filter(Boolean);
+      analysis = { labels: ['a custom image-based lesson'] };
+      setLessonLoading(100, 'Lesson ready!', 'The AI finished analyzing your picture. Press Play to begin.');
+      caption.textContent = 'Image analyzed. Your custom lesson is ready — press Play.';
+    } catch (localError) {
+      console.warn('Local school AI unavailable, using browser image scan:', localError);
+      setLessonLoading(60, 'Finishing picture scan…', 'Using the built-in fallback image scan.');
+      try {
+        const transformers = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+        classifier ||= await transformers.pipeline('image-classification', 'Xenova/vit-base-patch16-224');
+        const results = await classifier(sourceUrl, { topk: 3 });
+        const labels = results.map(item => String(item.label || '').replace(/_/g, ' ')).filter(Boolean);
+        analysis = { labels };
+        setLessonLoading(100, 'Lesson ready!', 'Picture scan finished. Press Play to hear the explanation.');
+        caption.textContent = labels.length ? 'Image analyzed: I noticed ' + labels.join(', ') + '. Press Play for the detailed lesson.' : 'Image scan finished. Press Play for the detailed lesson.';
+      } catch (error) {
+        console.warn('Image analysis unavailable:', error);
+        setLessonLoading(100, 'Lesson ready!', 'Your picture is loaded. Add a topic or key parts for a more specific explanation.');
+        caption.textContent = 'Your picture is ready. Add a topic or key parts for a more specific explanation.';
+      }
     } finally {
       analysisInProgress = false;
       render();
@@ -189,6 +217,9 @@
     if (!selected || !selected.type.startsWith('image/')) return;
     if (imageSelected) imageSelected.textContent = 'Picture selected: ' + selected.name + '. Loading your animated lesson now…';
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+    const reader = new FileReader();
+    reader.onload = () => { window.eduLabsLessonImage = reader.result; };
+    reader.readAsDataURL(selected);
     sourceUrl = URL.createObjectURL(selected);
     image = new Image();
     image.onload = () => {

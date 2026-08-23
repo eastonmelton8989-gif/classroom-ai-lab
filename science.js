@@ -26,7 +26,7 @@
 
   let image = null, sourceUrl = null, isPlaying = false, position = 0, lastFrame = 0, frame = 0, announcedStep = -1;
   let zoom = 1, panX = 0, panY = 0, dragging = false, pointerX = 0, pointerY = 0;
-  let analysis = null, analysisInProgress = false, classifier = null, aiLesson = null;
+  let analysis = null, analysisInProgress = false, classifier = null, aiLesson = null, imageDataPromise = null;
   const duration = 60;
   const lessonBanks = {
     general: ['Introduce the science diagram and the question it explores.', 'Identify the important objects, labels, arrows, and relationships.', 'Focus on the first major part and explain its job.', 'Trace the process or relationship shown in the diagram.', 'Connect the parts and explain how the system works.', 'Review the whole system and its key scientific idea.'],
@@ -100,12 +100,13 @@
     render();
     const focus = topic?.value?.trim() || cSubject();
     const namedParts = (parts?.value || '').trim() || 'any important visible parts';
+    const imageBase64 = await imageDataPromise;
     try {
       const response = await fetch('/api/ai-tutor', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: window.eduLabsLessonImage,
+          imageBase64,
           prompt: 'Study this science image for a student learning ' + focus + '. '
             + 'Focus on ' + namedParts + '. Return only a JSON array of exactly 5 detailed, friendly lesson segments. '
             + 'Each segment should explain what is visibly present and its scientific meaning. Never invent labels that cannot be seen.'
@@ -217,9 +218,12 @@
     if (!selected || !selected.type.startsWith('image/')) return;
     if (imageSelected) imageSelected.textContent = 'Picture selected: ' + selected.name + '. Loading your animated lesson now…';
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-    const reader = new FileReader();
-    reader.onload = () => { window.eduLabsLessonImage = reader.result; };
-    reader.readAsDataURL(selected);
+    imageDataPromise = new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => { window.eduLabsLessonImage = reader.result; resolve(reader.result); };
+      reader.onerror = () => reject(new Error('The image could not be read.'));
+      reader.readAsDataURL(selected);
+    });
     sourceUrl = URL.createObjectURL(selected);
     image = new Image();
     image.onload = () => {

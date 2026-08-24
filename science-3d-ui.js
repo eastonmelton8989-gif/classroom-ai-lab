@@ -37,21 +37,43 @@ function setProgress(percent, title, detail, busy = true) {
   if (progressDetail) progressDetail.textContent = detail;
 }
 
+async function removeReadableDiagramText(canvas) {
+  try {
+    const { createWorker } = await import('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js');
+    const worker = await createWorker('eng');
+    const result = await worker.recognize(canvas);
+    await worker.terminate();
+    const words = (result.data?.words || []).filter(word => Number(word.confidence) >= 65 && String(word.text || '').trim().length >= 2);
+    const context = canvas.getContext('2d');
+    words.forEach(word => {
+      const box = word.bbox;
+      const pad = Math.max(5, Math.round(Math.max(box.x1 - box.x0, box.y1 - box.y0) * 0.22));
+      // Clear detected label text in the generator copy only. The original
+      // picture remains unchanged for the animated lesson and students.
+      context.clearRect(Math.max(0, box.x0 - pad), Math.max(0, box.y0 - pad), Math.min(canvas.width, box.x1 + pad) - Math.max(0, box.x0 - pad), Math.min(canvas.height, box.y1 + pad) - Math.max(0, box.y0 - pad));
+    });
+    return words.length;
+  } catch (error) {
+    console.warn('Diagram text cleanup unavailable:', error);
+    return 0;
+  }
+}
+
 async function readImageAsDataUrl(file) {
-  // Normalizes ordinary phone photos and diagrams before TripoSR sees them:
-  // large images are reduced to a useful size and low contrast is improved.
+  // Normalize the 3D-generator copy while keeping the student's original image
+  // untouched for the animated lesson.
   if (!window.createImageBitmap) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error('The image could not be read.'));
-      reader.onload = () => resolve(reader.result);
+      reader.onload = () => resolve({ dataUrl: reader.result, removedLabels: 0 });
       reader.readAsDataURL(file);
     });
   }
 
   const bitmap = await createImageBitmap(file);
   const longestSide = Math.max(bitmap.width, bitmap.height);
-  const scale = Math.min(1, 1280 / longestSide);
+  const scale = Math.min(1, 1600 / longestSide);
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));
   canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -61,7 +83,9 @@ async function readImageAsDataUrl(file) {
   context.filter = 'contrast(1.16) saturate(1.08) brightness(1.03)';
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close?.();
-  return canvas.toDataURL('image/jpeg', 0.92);
+  setProgress(18, 'Cleaning diagram labels…', 'Removing readable text from the copy used for 3D generation.');
+  const removedLabels = await removeReadableDiagramText(canvas);
+  return { dataUrl: canvas.toDataURL('image/png'), removedLabels };
 }
 
 function hideProgress() {
@@ -129,10 +153,14 @@ async function generateReal3D() {
   status.textContent = 'Preparing your science image…';
 
   try {
-    const imageBase64 = await readImageAsDataUrl(file);
+    const preparedImage = await readImageAsDataUrl(file);
+    const imageBase64 = preparedImage.dataUrl;
+    const labelDetail = preparedImage.removedLabels
+      ? `Removed ${preparedImage.removedLabels} readable diagram label${preparedImage.removedLabels === 1 ? '' : 's'} from the 3D-generator copy.`
+      : 'No readable diagram labels were found to remove.';
 
     setStep('generate');
-    setProgress(25, 'Creating your 3D model…', 'AI reconstruction is running. This may take a little while.');
+    setProgress(25, 'Creating your 3D model…', labelDetail);
     status.textContent = 'Creating your 3D model… This can take a little while.';
 
     // The browser cannot know the worker's exact percentage, so this is an

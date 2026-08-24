@@ -128,6 +128,7 @@
     const typedParts = (parts?.value || '').trim();
     const placedLabels = Array.isArray(window.eduLabsModelLabels) ? window.eduLabsModelLabels.join(', ') : '';
     const namedParts = [typedParts, placedLabels].filter(Boolean).join(', ') || 'any important visible parts';
+    const referenceContext = String(window.eduLabsReferenceContext || '').slice(0, 500);
     const imageBase64 = await imageDataPromise;
     try {
       const response = await fetch('/api/ai-tutor', {
@@ -139,6 +140,7 @@
             + 'Focus on ' + namedParts + '. Create exactly 5 detailed, friendly lesson segments. '
             + 'Read visible labels carefully; if a word is blurred or too small to read, say that it is unclear instead of guessing. '
             + 'Each segment must explain what is visibly present and its scientific meaning. Never invent labels that cannot be seen. '
+            + (referenceContext ? 'The student also chose reusable reference pictures titled: ' + referenceContext + '. Mention them only as comparison material, never as proof of hidden details in the uploaded image. ' : '')
             + 'Reply as a JSON array of five strings when possible, but a numbered five-part answer is also acceptable.'
         })
       });

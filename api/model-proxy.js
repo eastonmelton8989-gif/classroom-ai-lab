@@ -15,7 +15,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid model URL.' });
   }
 
-  if (modelUrl.origin !== workerUrl.origin || !modelUrl.pathname.startsWith('/models/')) {
+  const isLocalGeneratedModel = modelUrl.origin === workerUrl.origin && modelUrl.pathname.startsWith('/models/');
+  const isSmithsonianOpenModel = modelUrl.origin === 'https://3d-api.si.edu' && modelUrl.pathname.startsWith('/content/document/');
+  if (!isLocalGeneratedModel && !isSmithsonianOpenModel) {
     return res.status(403).json({ error: 'This model URL is not allowed.' });
   }
 
@@ -28,7 +30,7 @@ export default async function handler(req, res) {
     const model = Buffer.from(await response.arrayBuffer());
     res.setHeader('Content-Type', 'model/gltf-binary');
     res.setHeader('Content-Length', model.length);
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', isSmithsonianOpenModel ? 'public, s-maxage=86400' : 'no-store');
     return res.status(200).send(model);
   } catch {
     return res.status(502).json({ error: 'Could not retrieve the generated model.' });

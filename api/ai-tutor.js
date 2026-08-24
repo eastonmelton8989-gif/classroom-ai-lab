@@ -1,4 +1,5 @@
 // EduLabs AI tutor bridge: forwards student questions to the owner's local Ollama worker.
+export const config = { maxDuration: 60 };
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -6,6 +7,7 @@ export default async function handler(req, res) {
   }
 
   const endpoint = process.env.TRIPOSR_ENDPOINT;
+  console.log('[ai-tutor] request started', { hasImage: Boolean(req.body?.imageBase64) });
   const workerToken = process.env.TRIPOSR_TOKEN;
   const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
   const imageBase64 = req.body?.imageBase64;
@@ -24,7 +26,7 @@ export default async function handler(req, res) {
   workerUrl.search = '';
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
+  const timeout = setTimeout(() => controller.abort(), 55000);
   try {
     const response = await fetch(workerUrl, {
       method: 'POST',
@@ -35,16 +37,23 @@ export default async function handler(req, res) {
       body: JSON.stringify({ prompt, ...(imageBase64 ? { imageBase64 } : {}) }),
       signal: controller.signal
     });
+    console.log('[ai-tutor] worker responded', { status: response.status });
     const raw = await response.text();
     let data = {};
     try { data = raw ? JSON.parse(raw) : {}; } catch { data = { detail: raw }; }
     if (!response.ok) {
-      return res.status(response.status === 401 ? 503 : response.status).json({
-        message: data.detail || data.message || 'The school AI could not answer right now.'
+      const gatewayError = [502, 503, 504].includes(response.status);
+      console.error('[ai-tutor] worker error', { status: response.status, detail: data.detail || data.message || 'no detail' });
+      return res.status(gatewayError || response.status === 401 ? 503 : response.status).json({
+        message: gatewayError
+          ? 'The school AI is starting up or taking too long. Please try again in 20 seconds.'
+          : (data.detail || data.message || 'The school AI could not answer right now.')
       });
     }
+    console.log('[ai-tutor] request completed');
     return res.status(200).json({ answer: data.answer });
   } catch (error) {
+    console.error('[ai-tutor] request failed', { name: error.name, message: error.message });
     return res.status(503).json({
       message: error.name === 'AbortError'
         ? 'The school AI took too long. Please try again.'

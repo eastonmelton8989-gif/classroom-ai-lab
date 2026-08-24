@@ -90,6 +90,28 @@
     message.volume = 1;
     window.speechSynthesis.speak(message);
   }
+  function normalizeAiLesson(answer) {
+    const raw = String(answer || '').trim();
+    if (!raw) return null;
+    const candidates = [raw, raw.match(/\[[\s\S]*\]/)?.[0]].filter(Boolean);
+    for (const candidate of candidates) {
+      try {
+        const parsed = JSON.parse(candidate.replace(/^\`\`\`json\s*|\s*\`\`\`$/gi, ''));
+        const items = Array.isArray(parsed) ? parsed : (parsed.lesson || parsed.segments || parsed.steps);
+        if (Array.isArray(items)) {
+          const cleaned = items.map(item => typeof item === 'string' ? item : (item.text || item.explanation || item.content || '')).map(item => String(item).trim()).filter(Boolean);
+          if (cleaned.length >= 3) return cleaned.slice(0, 5);
+        }
+      } catch (_) { /* Plain-language answers are handled below. */ }
+    }
+    const lines = raw.split(/\n+/).map(line => line.replace(/^\s*(?:\d+[.)]|[-•])\s*/, '').trim()).filter(line => line.length > 18);
+    if (lines.length >= 3) return lines.slice(0, 5);
+    const sentences = raw.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(value => value.trim()).filter(Boolean) || [];
+    if (sentences.length < 3) return null;
+    const groups = Array.from({ length: Math.min(5, sentences.length) }, () => []);
+    sentences.forEach((sentence, index) => groups[Math.min(groups.length - 1, Math.floor(index * groups.length / sentences.length))].push(sentence));
+    return groups.map(group => group.join(' ')).filter(Boolean);
+  }
   async function analyzeImage() {
     if (!sourceUrl || analysisInProgress) return;
     analysisInProgress = true;
@@ -108,16 +130,16 @@
         body: JSON.stringify({
           imageBase64,
           prompt: 'Study this science image for a student learning ' + focus + '. '
-            + 'Focus on ' + namedParts + '. Return only a JSON array of exactly 5 detailed, friendly lesson segments. '
-            + 'Each segment should explain what is visibly present and its scientific meaning. Never invent labels that cannot be seen.'
+            + 'Focus on ' + namedParts + '. Create exactly 5 detailed, friendly lesson segments. '
+            + 'Read visible labels carefully; if a word is blurred or too small to read, say that it is unclear instead of guessing. '
+            + 'Each segment must explain what is visibly present and its scientific meaning. Never invent labels that cannot be seen. '
+            + 'Reply as a JSON array of five strings when possible, but a numbered five-part answer is also acceptable.'
         })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || 'The school AI could not read the image.');
-      const match = String(data.answer || '').match(/\[[\s\S]*\]/);
-      const parsed = match ? JSON.parse(match[0]) : null;
-      if (!Array.isArray(parsed) || parsed.length < 3) throw new Error('The school AI returned an incomplete lesson.');
-      aiLesson = parsed.slice(0, 5).map(item => String(item).trim()).filter(Boolean);
+      aiLesson = normalizeAiLesson(data.answer);
+      if (!aiLesson || aiLesson.length < 3) throw new Error('The school AI returned an incomplete lesson.');
       analysis = { labels: ['a custom image-based lesson'] };
       setLessonLoading(100, 'Lesson ready!', 'The AI finished analyzing your picture. Press Play to begin.');
       caption.textContent = 'Image analyzed. Your custom lesson is ready — press Play.';

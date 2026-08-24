@@ -45,7 +45,10 @@ function orientAndFrame(model) {
   const maxSize = Math.max(finalSize.x, finalSize.y, finalSize.z) || 1;
   const scale = 2.8 / maxSize;
   model.scale.multiplyScalar(scale);
-  model.position.y = -0.15;
+  model.updateMatrixWorld(true);
+  // Rest the model above the floor without losing the centering adjustment.
+  const scaledBox = new THREE.Box3().setFromObject(model);
+  model.position.y += -1.45 - scaledBox.min.y;
 }
 
 function createViewer() {
@@ -66,6 +69,9 @@ function createViewer() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 1000);
   camera.position.set(3.2, 2.2, 4.5);
+  // A positioned camera still looks straight ahead by default. Aim it at the
+  // centered model so it does not appear pushed to one side of the canvas.
+  camera.lookAt(0, 0, 0);
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 2.2));
   const key = new THREE.DirectionalLight(0xffffff, 3.2);

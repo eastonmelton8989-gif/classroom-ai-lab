@@ -125,7 +125,9 @@
     caption.textContent = 'The school AI is studying your image…';
     render();
     const focus = topic?.value?.trim() || cSubject();
-    const namedParts = (parts?.value || '').trim() || 'any important visible parts';
+    const typedParts = (parts?.value || '').trim();
+    const placedLabels = Array.isArray(window.eduLabsModelLabels) ? window.eduLabsModelLabels.join(', ') : '';
+    const namedParts = [typedParts, placedLabels].filter(Boolean).join(', ') || 'any important visible parts';
     const imageBase64 = await imageDataPromise;
     try {
       const response = await fetch('/api/ai-tutor', {
@@ -312,5 +314,12 @@
   const endDrag = () => { dragging = false; canvas.classList.remove('dragging'); };
   canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
   window.addEventListener('resize', render);
+  window.refreshScienceLessonFromLabels = function() {
+    if (!image || analysisInProgress) return false;
+    position = 0;
+    announcedStep = -1;
+    analyzeImage();
+    return true;
+  };
   render();
 })();

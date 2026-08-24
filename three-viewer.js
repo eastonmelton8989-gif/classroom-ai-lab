@@ -93,6 +93,7 @@ function createViewer() {
   scene.add(labels);
 
   function clearLabels() {
+    window.eduLabsModelLabels = [];
     while (labels.children.length) {
       const item = labels.children.pop();
       item.geometry?.dispose?.();
@@ -144,6 +145,7 @@ function createViewer() {
     const sprite = makeLabelSprite(armedLabel);
     sprite.position.copy(anchor).add(new THREE.Vector3(0.12, 0.16, 0));
     labels.add(line, sprite);
+    window.eduLabsModelLabels = [...new Set([...(window.eduLabsModelLabels || []), armedLabel])];
     armedLabel = '';
     window.dispatchEvent(new CustomEvent('science-model-label-placed'));
     return true;
@@ -243,6 +245,16 @@ document.getElementById('placeModelLabel')?.addEventListener('click', () => {
     return;
   }
   if (modelLabelStatus) modelLabelStatus.textContent = 'Now click the exact part of the 3D model where this label belongs.';
+});
+document.getElementById('useModelLabels')?.addEventListener('click', () => {
+  const labels = window.eduLabsModelLabels || [];
+  if (!labels.length) {
+    if (modelLabelStatus) modelLabelStatus.textContent = 'Place at least one label on the model first.';
+    return;
+  }
+  if (window.refreshScienceLessonFromLabels?.()) {
+    if (modelLabelStatus) modelLabelStatus.textContent = 'The animated lesson is updating to explain: ' + labels.join(', ') + '.';
+  }
 });
 document.getElementById('clearModelLabels')?.addEventListener('click', () => {
   window.clearScienceModelLabels();

@@ -224,8 +224,11 @@ async function generateReal3D() {
     let result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.message || result.error || `3D service returned ${response.status}`);
     if (result.jobId) {
+      const sourceDetail = result.referenceUsed
+        ? 'AI matched a credited reference (' + (result.referenceTitle || 'science reference') + ') and sent it to the 3D generator.'
+        : 'No reliable online match was available, so the uploaded image was sent to the 3D generator.';
       status.textContent = 'Your 3D model job started. This can take a few minutes.';
-      setProgress(28, 'Creating your 3D model…', 'The generator is working in the background. You can keep this page open.');
+      setProgress(28, 'Creating your 3D model…', sourceDetail);
       result = await waitFor3DJob(result.jobId);
     }
 

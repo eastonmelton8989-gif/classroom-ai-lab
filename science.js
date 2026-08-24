@@ -237,9 +237,35 @@
     };
     image.src = sourceUrl;
   }
-  function selectImage(selected) {
+  async function enhanceImage(selected) {
+    if (!window.createImageBitmap) return selected;
+    const bitmap = await createImageBitmap(selected);
+    const longest = Math.max(bitmap.width, bitmap.height);
+    // Improve visibility for small or hazy classroom images. This can sharpen
+    // edges and contrast, but cannot recreate text that was never captured.
+    const scale = Math.min(2, Math.max(1, 1600 / longest));
+    const enhanced = document.createElement('canvas');
+    enhanced.width = Math.round(bitmap.width * scale);
+    enhanced.height = Math.round(bitmap.height * scale);
+    const context = enhanced.getContext('2d');
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.filter = 'contrast(1.2) brightness(1.04) saturate(1.08)';
+    context.drawImage(bitmap, 0, 0, enhanced.width, enhanced.height);
+    bitmap.close?.();
+    const blob = await new Promise(resolve => enhanced.toBlob(resolve, 'image/jpeg', 0.94));
+    return blob ? new File([blob], selected.name.replace(/\.[^.]+$/, '') + '-enhanced.jpg', { type: 'image/jpeg' }) : selected;
+  }
+  async function selectImage(selected) {
     if (!selected || !selected.type.startsWith('image/')) { caption.textContent = 'Please choose a PNG, JPG, WEBP, or another image file.'; return; }
-    loadImage(selected);
+    try {
+      setLessonLoading(5, 'Enhancing picture…', 'Improving contrast and clarity before the AI analyzes it.');
+      if (imageSelected) imageSelected.textContent = 'Picture selected: ' + selected.name + '. Improving visibility…';
+      loadImage(await enhanceImage(selected));
+    } catch (error) {
+      console.warn('Image enhancement unavailable:', error);
+      loadImage(selected);
+    }
   }
   const pickSelectedImage = event => selectImage(event.target.files?.[0]);
   file.addEventListener('change', pickSelectedImage);

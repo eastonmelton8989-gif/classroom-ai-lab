@@ -1,5 +1,6 @@
 // EduLabs AI Science Lab — Image-to-3D API bridge
 // Supports hosted AI generation while keeping the local worker option available.
+export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -10,6 +11,7 @@ export default async function handler(req, res) {
   const endpoint = process.env.TRIPOSR_ENDPOINT;
   const workerToken = process.env.TRIPOSR_TOKEN;
   const falKey = process.env.FAL_KEY;
+  console.log('[generate-3d] request started', { hasImage: Boolean(req.body?.imageBase64), hasEndpoint: Boolean(endpoint) });
 
   if (!endpoint && !falKey) {
     return res.status(503).json({
@@ -32,6 +34,7 @@ export default async function handler(req, res) {
   try {
     // Existing custom TripoSR worker support
     if (endpoint) {
+      console.log('[generate-3d] sending image to local worker');
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -46,12 +49,19 @@ export default async function handler(req, res) {
       const raw = await response.text();
       let data = {};
       try { data = raw ? JSON.parse(raw) : {}; } catch { data = { message: raw }; }
+      console.log('[generate-3d] worker responded', { status: response.status });
       if (!response.ok) {
-        throw new Error(`3D worker returned ${response.status}: ${data.detail || data.message || data.error || 'Unknown worker error'}`);
+        const detail = String(data.detail || data.message || data.error || 'Unknown worker error').slice(0, 300);
+        console.error('[generate-3d] worker error', { status: response.status, detail });
+        throw new Error(`3D worker returned ${response.status}: ${detail}`);
       }
 
       const modelUrl = data.modelUrl || data.glbUrl || data.url;
-      if (!modelUrl) throw new Error('3D worker returned no GLB model URL.');
+      if (!modelUrl) {
+        console.error('[generate-3d] worker returned no model URL');
+        throw new Error('3D worker returned no GLB model URL.');
+      }
+      console.log('[generate-3d] model URL received');
       return res.status(200).json({
         available: true,
         modelUrl: `/api/model-proxy?url=${encodeURIComponent(modelUrl)}`,
@@ -67,6 +77,7 @@ export default async function handler(req, res) {
       message: 'FAL_KEY detected. Configure the TripoSR endpoint before enabling production generation.'
     });
   } catch (error) {
+    console.error('[generate-3d] request failed', { name: error.name, message: error.message });
     return res.status(503).json({
       available: false,
       error: error.name === 'AbortError' ? 'timeout' : 'connection',

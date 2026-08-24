@@ -104,6 +104,33 @@ function friendlyError(error) {
   return 'We could not create the 3D model from that image. Try a clearer image with one main object.';
 }
 
+async function chooseAiReference(imageBase64) {
+  try {
+    setProgress(22, 'Finding a model reference…', 'The AI is identifying the science object and checking free reference images.');
+    const topicHint = topicInput?.value?.trim() || subjectInput?.options?.[subjectInput.selectedIndex]?.text || 'science object';
+    const answer = await fetch('/api/ai-tutor', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        imageBase64,
+        prompt: 'Identify the main science object in this image. Reply with only a precise 2-to-5-word search phrase for a reusable reference image. Use the student topic as a hint: ' + topicHint + '. If unsure, reply UNKNOWN.'
+      })
+    }).then(async response => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'AI identification unavailable.');
+      return data.answer;
+    });
+    const query = String(answer || '').replace(/[^a-zA-Z0-9 ,'-]/g, ' ').trim().slice(0, 100);
+    if (!query || /^unknown$/i.test(query) || !window.eduLabsFindReferences) return null;
+    const references = await window.eduLabsFindReferences(query);
+    const best = references?.[0];
+    return best?.imageUrl ? best : null;
+  } catch (error) {
+    console.warn('AI reference selection unavailable:', error);
+    return null;
+  }
+}
+
 async function waitFor3DJob(jobId) {
   const deadline = Date.now() + 9 * 60 * 1000;
   let attempts = 0;
@@ -155,9 +182,12 @@ async function generateReal3D() {
   try {
     const preparedImage = await readImageAsDataUrl(file);
     const imageBase64 = preparedImage.dataUrl;
-    const labelDetail = preparedImage.removedLabels
-      ? `Removed ${preparedImage.removedLabels} readable diagram label${preparedImage.removedLabels === 1 ? '' : 's'} from the 3D-generator copy.`
-      : 'No readable diagram labels were found to remove.';
+    const reference = await chooseAiReference(imageBase64);
+    const labelDetail = reference
+      ? 'AI found a credited reference for ' + reference.title + ' and will use it as the model source.'
+      : (preparedImage.removedLabels
+        ? `Removed ${preparedImage.removedLabels} readable diagram label${preparedImage.removedLabels === 1 ? '' : 's'} from the 3D-generator copy.`
+        : 'No trusted reference was found, so the uploaded image will be used.');
 
     setStep('generate');
     setProgress(25, 'Creating your 3D model…', labelDetail);
@@ -181,6 +211,7 @@ async function generateReal3D() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           imageBase64,
+          ...(reference ? { referenceImageUrl: reference.imageUrl, referenceTitle: reference.title } : {}),
           imageName: file.name,
           subject: subjectInput?.value || 'general',
           topic: topicInput?.value?.trim() || ''

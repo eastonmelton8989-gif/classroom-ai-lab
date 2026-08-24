@@ -80,6 +80,28 @@ function friendlyError(error) {
   return 'We could not create the 3D model from that image. Try a clearer image with one main object.';
 }
 
+async function waitFor3DJob(jobId) {
+  const deadline = Date.now() + 9 * 60 * 1000;
+  let attempts = 0;
+  while (Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    attempts += 1;
+    const response = await fetch('/api/generate-3d', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jobId })
+    });
+    const update = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(update.message || 'The 3D generator stopped while building the model.');
+    if (update.status === 'complete' && update.modelUrl) return update;
+    if (update.status === 'failed') throw new Error(update.detail || 'The 3D generator could not finish this image.');
+    const percent = Math.min(74, 28 + attempts * 2);
+    setProgress(percent, 'Creating your 3D model…', update.detail || 'The generator is still working. Please keep this page open.');
+    status.textContent = update.detail || 'Creating your 3D model…';
+  }
+  throw new Error('The 3D model is taking unusually long. Please try a smaller image with one main object.');
+}
+
 async function generateReal3D() {
   const file = fileInput?.files?.[0];
   if (!file) {
@@ -140,8 +162,13 @@ async function generateReal3D() {
       clearInterval(progressTimer);
     }
 
-    const result = await response.json().catch(() => ({}));
+    let result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.message || result.error || `3D service returned ${response.status}`);
+    if (result.jobId) {
+      status.textContent = 'Your 3D model job started. This can take a few minutes.';
+      setProgress(28, 'Creating your 3D model…', 'The generator is working in the background. You can keep this page open.');
+      result = await waitFor3DJob(result.jobId);
+    }
 
     const modelUrl = result.modelUrl || result.glbUrl || result.outputUrl || result.url || result.model?.url;
     if (!modelUrl) throw new Error(result.error || 'The 3D service returned no model file.');

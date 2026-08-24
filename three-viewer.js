@@ -83,7 +83,71 @@ function createViewer() {
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
+  let startX = 0;
+  let startY = 0;
   let autoRotate = true;
+  let armedLabel = '';
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const labels = new THREE.Group();
+  scene.add(labels);
+
+  function clearLabels() {
+    while (labels.children.length) {
+      const item = labels.children.pop();
+      item.geometry?.dispose?.();
+      item.material?.map?.dispose?.();
+      item.material?.dispose?.();
+    }
+  }
+
+  function makeLabelSprite(text) {
+    const labelCanvas = document.createElement('canvas');
+    const context = labelCanvas.getContext('2d');
+    context.font = '700 32px Arial';
+    const width = Math.min(460, Math.max(150, Math.ceil(context.measureText(text).width + 56)));
+    labelCanvas.width = width;
+    labelCanvas.height = 66;
+    context.font = '700 32px Arial';
+    context.fillStyle = '#07152f';
+    context.strokeStyle = '#7dd3fc';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.roundRect?.(3, 3, width - 6, 60, 14);
+    if (!context.roundRect) context.rect(3, 3, width - 6, 60);
+    context.fill();
+    context.stroke();
+    context.fillStyle = '#ffffff';
+    context.textBaseline = 'middle';
+    context.fillText(text, 26, 33);
+    const texture = new THREE.CanvasTexture(labelCanvas);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
+    sprite.scale.set(width / 190, 0.35, 1);
+    return sprite;
+  }
+
+  function placeLabel(event) {
+    if (!armedLabel || !model) return false;
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObject(model, true)[0];
+    if (!hit) return false;
+    const point = hit.point.clone();
+    const normal = hit.face?.normal?.clone().transformDirection(hit.object.matrixWorld).normalize() || new THREE.Vector3(0, 1, 0);
+    const anchor = point.clone().addScaledVector(normal, 0.42);
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([point, anchor]),
+      new THREE.LineBasicMaterial({ color: 0x7dd3fc, depthTest: false })
+    );
+    const sprite = makeLabelSprite(armedLabel);
+    sprite.position.copy(anchor).add(new THREE.Vector3(0.12, 0.16, 0));
+    labels.add(line, sprite);
+    armedLabel = '';
+    window.dispatchEvent(new CustomEvent('science-model-label-placed'));
+    return true;
+  }
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -97,11 +161,15 @@ function createViewer() {
   canvas.addEventListener('pointerdown', event => {
     dragging = true;
     autoRotate = false;
-    lastX = event.clientX;
-    lastY = event.clientY;
+    startX = lastX = event.clientX;
+    startY = lastY = event.clientY;
     canvas.setPointerCapture?.(event.pointerId);
   });
-  canvas.addEventListener('pointerup', () => { dragging = false; });
+  canvas.addEventListener('pointerup', event => {
+    const wasClick = Math.hypot(event.clientX - startX, event.clientY - startY) < 7;
+    dragging = false;
+    if (wasClick && placeLabel(event)) canvas.style.cursor = 'grab';
+  });
   canvas.addEventListener('pointerleave', () => { dragging = false; });
   canvas.addEventListener('pointermove', event => {
     if (!dragging || !model) return;
@@ -134,6 +202,7 @@ function createViewer() {
           disposeObject(model);
         }
         model = gltf.scene;
+        clearLabels();
         orientAndFrame(model);
         scene.add(model);
         autoRotate = true;
@@ -142,7 +211,14 @@ function createViewer() {
         console.error(error);
         window.dispatchEvent(new CustomEvent('science-model-error', { detail: error }));
       });
-    }
+    },
+    armLabel(text) {
+      if (!model || !String(text || '').trim()) return false;
+      armedLabel = String(text).trim().slice(0, 42);
+      canvas.style.cursor = 'crosshair';
+      return true;
+    },
+    clearLabels
   };
 
   return scienceViewer;
@@ -152,3 +228,27 @@ window.loadScienceModel = function(modelUrl) {
   return createViewer().load(modelUrl);
 };
 window.loadScienceGLB = window.loadScienceModel;
+window.armScienceModelLabel = function(text) {
+  return createViewer().armLabel(text);
+};
+window.clearScienceModelLabels = function() {
+  createViewer().clearLabels();
+};
+
+const modelLabelText = document.getElementById('modelLabelText');
+const modelLabelStatus = document.getElementById('modelLabelStatus');
+document.getElementById('placeModelLabel')?.addEventListener('click', () => {
+  if (!window.armScienceModelLabel(modelLabelText?.value)) {
+    if (modelLabelStatus) modelLabelStatus.textContent = 'Create the 3D model first, then add a label.';
+    return;
+  }
+  if (modelLabelStatus) modelLabelStatus.textContent = 'Now click the exact part of the 3D model where this label belongs.';
+});
+document.getElementById('clearModelLabels')?.addEventListener('click', () => {
+  window.clearScienceModelLabels();
+  if (modelLabelStatus) modelLabelStatus.textContent = 'Labels cleared. Add another label, then click the matching model part.';
+});
+window.addEventListener('science-model-label-placed', () => {
+  if (modelLabelText) modelLabelText.value = '';
+  if (modelLabelStatus) modelLabelStatus.textContent = 'Label placed on the model. Add another label whenever you need one.';
+});

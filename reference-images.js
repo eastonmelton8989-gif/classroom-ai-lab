@@ -7,11 +7,9 @@
   if (!button || !grid || !status) return;
 
   function setStatus(message) { status.textContent = message; }
-
-  function query() {
+  function defaultQuery() {
     return topic?.value.trim() || subject?.options?.[subject.selectedIndex]?.text || '';
   }
-
   function showItems(items) {
     grid.replaceChildren();
     items.forEach(item => {
@@ -32,30 +30,27 @@
     });
   }
 
+  async function findReferences(searchText) {
+    const text = String(searchText || defaultQuery()).trim();
+    if (!text) throw new Error('Type a science topic above first.');
+    setStatus('Finding free, credited reference images…');
+    const response = await fetch('/api/reference-images?q=' + encodeURIComponent(text));
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || 'Reference search is unavailable.');
+    if (!data.items?.length) throw new Error('No reusable reference images were found for this topic.');
+    window.eduLabsReferenceItems = data.items;
+    window.eduLabsReferenceContext = data.items.map(item => item.title).join(', ');
+    showItems(data.items);
+    setStatus('Showing reusable references from Wikimedia Commons. Open any picture to see its source and license.');
+    return data.items;
+  }
+
+  window.eduLabsFindReferences = findReferences;
   button.addEventListener('click', async () => {
-    const text = query();
-    if (!text) {
-      setStatus('Type a science topic above first.');
-      return;
-    }
     button.disabled = true;
     grid.replaceChildren();
-    setStatus('Finding free, credited reference images…');
-    try {
-      const response = await fetch('/api/reference-images?q=' + encodeURIComponent(text));
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || 'Reference search is unavailable.');
-      if (!data.items?.length) {
-        setStatus('No reusable reference images were found. Try a more specific topic.');
-        return;
-      }
-      window.eduLabsReferenceContext = data.items.map(item => item.title).join(', ');
-      showItems(data.items);
-      setStatus('Showing reusable references from Wikimedia Commons. Open any picture to see its source and license.');
-    } catch (error) {
-      setStatus(error.message || 'Reference search is unavailable right now.');
-    } finally {
-      button.disabled = false;
-    }
+    try { await findReferences(); }
+    catch (error) { setStatus(error.message || 'Reference search is unavailable right now.'); }
+    finally { button.disabled = false; }
   });
 })();

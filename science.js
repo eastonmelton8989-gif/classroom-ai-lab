@@ -82,12 +82,16 @@
     window.speechSynthesis.cancel();
     const message = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(voice => /^en-US/i.test(voice.lang) && /natural|aria|jenny|zira|samantha/i.test(voice.name))
-      || voices.find(voice => /^en/i.test(voice.lang));
-    if (preferred) message.voice = preferred;
-    message.rate = 0.86;
-    message.pitch = 0.98;
-    message.volume = 1;
+    const gentleVoice = voices
+      .filter(voice => /^en/i.test(voice.lang))
+      .sort((a, b) => {
+        const score = voice => /natural|neural|online|aria|jenny|sonia|libby|samantha|zira|ava/i.test(voice.name) ? 1 : 0;
+        return score(b) - score(a);
+      })[0];
+    if (gentleVoice) message.voice = gentleVoice;
+    message.rate = 0.80;
+    message.pitch = 0.92;
+    message.volume = 0.78;
     window.speechSynthesis.speak(message);
   }
   function normalizeAiLesson(answer) {

@@ -104,9 +104,9 @@ function friendlyError(error) {
   return 'We could not create the 3D model from that image. Try a clearer image with one main object.';
 }
 
-async function chooseAiReference(imageBase64) {
+async function chooseAiSources(imageBase64) {
   try {
-    setProgress(22, 'Finding a model reference…', 'The AI is identifying the science object and checking free reference images.');
+    setProgress(22, 'Finding a model reference…', 'The AI is identifying the science object and checking free references.');
     const topicHint = topicInput?.value?.trim() || subjectInput?.options?.[subjectInput.selectedIndex]?.text || 'science object';
     const answer = await fetch('/api/ai-tutor', {
       method: 'POST',
@@ -121,13 +121,17 @@ async function chooseAiReference(imageBase64) {
       return data.answer;
     });
     const query = String(answer || '').replace(/[^a-zA-Z0-9 ,'-]/g, ' ').trim().slice(0, 100);
-    if (!query || /^unknown$/i.test(query) || !window.eduLabsFindReferences) return null;
-    const references = await window.eduLabsFindReferences(query);
-    const best = references?.[0];
-    return best?.imageUrl ? best : null;
+    if (!query || /^unknown$/i.test(query)) return {};
+    const modelPromise = fetch('/api/reference-model?q=' + encodeURIComponent(query))
+      .then(response => response.ok ? response.json() : {})
+      .then(data => data.model || null)
+      .catch(() => null);
+    const referencePromise = window.eduLabsFindReferences ? window.eduLabsFindReferences(query).catch(() => []) : Promise.resolve([]);
+    const [directModel, references] = await Promise.all([modelPromise, referencePromise]);
+    return { directModel, reference: references?.[0] || null };
   } catch (error) {
     console.warn('AI reference selection unavailable:', error);
-    return null;
+    return {};
   }
 }
 
@@ -182,12 +186,37 @@ async function generateReal3D() {
   try {
     const preparedImage = await readImageAsDataUrl(file);
     const imageBase64 = preparedImage.dataUrl;
-    const reference = await chooseAiReference(imageBase64);
-    const labelDetail = reference
+    const sources = await chooseAiSources(imageBase64);
+    const reference = sources.reference;
+    const directModel = sources.directModel;
+    const labelDetail = directModel
+      ? 'AI found a reusable Smithsonian 3D model for ' + directModel.title + '.'
+      : (reference
       ? 'AI found a credited reference for ' + reference.title + ' and will use it as the model source.'
       : (preparedImage.removedLabels
         ? `Removed ${preparedImage.removedLabels} readable diagram label${preparedImage.removedLabels === 1 ? '' : 's'} from the 3D-generator copy.`
-        : 'No trusted reference was found, so the uploaded image will be used.');
+        : 'No trusted reference was found, so the uploaded image will be used.'));
+
+    if (directModel) {
+      const modelUrl = '/api/model-proxy?url=' + encodeURIComponent(directModel.modelUrl);
+      generatedModelUrl = modelUrl;
+      setStep('fix');
+      setProgress(78, 'Loading verified 3D model…', 'Using a reusable Smithsonian Open Access model instead of guessing from one image.');
+      status.textContent = 'Loading the verified 3D science model…';
+      window.loadScienceModel(modelUrl);
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('The reference model took too long to load.')), 30000);
+        const done = () => { clearTimeout(timeout); window.removeEventListener('science-model-rendered', done); window.removeEventListener('science-model-error', failed); resolve(); };
+        const failed = event => { clearTimeout(timeout); window.removeEventListener('science-model-rendered', done); window.removeEventListener('science-model-error', failed); reject(event.detail || new Error('Reference model failed')); };
+        window.addEventListener('science-model-rendered', done, { once: true });
+        window.addEventListener('science-model-error', failed, { once: true });
+      });
+      setStep('ready');
+      setProgress(100, 'Verified 3D model ready!', 'Loaded from Smithsonian Open Access. Drag to rotate and scroll to zoom.', false);
+      if (downloadButton) { downloadButton.href = modelUrl; downloadButton.hidden = false; }
+      status.textContent = 'A verified Smithsonian 3D model is ready.';
+      return;
+    }
 
     setStep('generate');
     setProgress(25, 'Creating your 3D model…', labelDetail);
